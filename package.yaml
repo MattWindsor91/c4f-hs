@@ -1,10 +1,10 @@
 name:                c4f
 version:             0.1.0.0
-github:              "githubuser/c4f"
-license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2020 Author name here"
+github:              "MattWindsor91/c4f"
+license:             MIT
+author:              "Matt Windsor"
+maintainer:          "m.windsor@imperial.ac.uk"
+copyright:           "2020 Matt Windsor"
 
 extra-source-files:
 - README.md
@@ -17,10 +17,12 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/c4f#readme>
+description:         Please see the README on GitHub at <https://github.com/MattWindsor91/c4f#readme>
 
 dependencies:
 - base >= 4.7 && < 5
+- bytestring >= 0.10.10.1 && < 0.11
+- lens >= 4.18.1 && < 5
 
 library:
   source-dirs: src
@@ -46,3 +48,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - c4f
+    - hedgehog >= 1.0.3 && < 2
