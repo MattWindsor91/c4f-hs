@@ -22,7 +22,9 @@ description:         Please see the README on GitHub at <https://github.com/Matt
 dependencies:
 - base >= 4.7 && < 5
 - bytestring >= 0.10.10.1 && < 0.11
+- hedgehog >= 1.0.3 && < 2
 - lens >= 4.18.1 && < 5
+- recursion-schemes >= 5.1.3 && < 6
 
 library:
   source-dirs: src
@@ -48,4 +50,3 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - c4f
-    - hedgehog >= 1.0.3 && < 2
