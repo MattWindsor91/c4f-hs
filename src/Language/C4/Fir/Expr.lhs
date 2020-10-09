@@ -13,7 +13,6 @@ Expressions
 > -}
 > module Language.C4.Fir.Expr
 >   ( Expr (Meta, Prim, Bin)
->   , Lvalue (Var, Deref)
 >   , PrimExpr (Con, Lv)
 >     -- Binary operator shorthand
 >   , (@+) -- :: Expr m -> Expr m -> Expr m
@@ -35,19 +34,9 @@ Expressions
 > import Data.Functor.Foldable as F
 > import Language.C4.Fir.Const (AsConst, Const, _Const)
 > import Language.C4.Fir.Id (Id)
+> import Language.C4.Fir.Lvalue (Lvalue)
 > import Language.C4.Fir.Op
 >   (ABop (..), BBop (..), LBop (..), RBop (..), Bop (..))
-
-Lvalues
--------
-
-To move.
-
-> -- | Lvalues.
-> data Lvalue
->   = Var Id -- ^ A variable reference.
->   | Deref Lvalue -- ^ A dereference of another lvalue.
->     deriving (Eq, Show)
 
 Primitive expressions
 ---------------------

@@ -11,11 +11,20 @@ Identifiers
 > -}
 > module Language.C4.Fir.Id
 >   ( Id
->   , bytes -- :: Control.Lens.Prism' Data.ByteString.Char8.ByteString Id
+>     -- Conversion to and from bytestrings
+>   , fromBytes -- :: Data.Bytestring.Char8.ByteString -> Maybe Id
+>   , toBytes -- :: Id -> Data.Bytestring.Char8.Bytestring
+>     -- Optics
+>   , AsId -- typeclass
+>   , _Id -- :: AsId t => Control.Lens.Prism' t Id
+>   , HasId -- :: typeclass
+>   , underlyingId -- :: HasId t => Control.Lens.Lens' t Id
+>     -- Generators
 >   , gen -- :: Hedgehog.Gen.MonadGen m => m Id
 >   )
 > where
 > import Data.Char (isAlpha, isAlphaNum)
+> import qualified Control.Lens as LL
 > import qualified Control.Lens.Prism as LP
 > import qualified Data.ByteString.Char8 as C
 
@@ -71,13 +80,38 @@ invariants.
 >     fromBytes' (c, cs) | isValidInitial c && C.all isValidNonInitial cs = Just (Id x)
 >     fromBytes' _ = Nothing
 
-There then exists a prism mapping from bytestrings to identifiers: all
+Optics
+------
+
+We generate two sets of 'classy' optics for identifiers:
+
+- a prism for focusing on things that can _directly_ hold an identifier:
+  `AsId`;
+- a lens for focusing on the underlying identifier of things that _absolutely_
+  hold one, if indirectly: `HasId`.
+
+Deriving the two using the usual Template Haskell schemes doesn't seem to work
+well, but we can do so manually.
+
+> -- | Typeclass of types that can directly represent identifiers.
+> class AsId t where
+>   _Id :: LP.Prism' t Id -- ^ Tries to view the type as an Id.
+> instance AsId Id where _Id = id
+
+> -- | Typeclass of types that can indirectly hold identifiers.
+> class HasId t where
+>   underlyingId :: LL.Lens' t Id -- ^ Focuses on the underlying identifier.
+> instance HasId Id where underlyingId = id
+
+There exists a prism mapping from bytestrings to identifiers: all
 identifiers are valid bytestrings, but not all bytestrings are valid
 identifiers.
 
 > -- | Lets us view valid C identifier bytestrings as `Id`s, and vice versa.
 > bytes :: LP.Prism' C.ByteString Id
 > bytes = LP.prism' toBytes fromBytes
+
+> instance AsId C.ByteString where _Id = bytes
 
 Generating IDs
 --------------

@@ -26,8 +26,10 @@ source-repository head
 library
   exposed-modules:
       Language.C4.Fir.Const
+      Language.C4.Fir.Eval
       Language.C4.Fir.Expr
       Language.C4.Fir.Id
+      Language.C4.Fir.Lvalue
       Language.C4.Fir.Op
       Lib
   other-modules:
@@ -39,6 +41,7 @@ library
     , bytestring >=0.10.10.1 && <0.11
     , hedgehog >=1.0.3 && <2
     , lens >=4.18.1 && <5
+    , mtl >=2.2.2 && <3
     , recursion-schemes >=5.1.3 && <6
   default-language: Haskell2010
 
@@ -55,6 +58,7 @@ executable c4f-exe
     , c4f
     , hedgehog >=1.0.3 && <2
     , lens >=4.18.1 && <5
+    , mtl >=2.2.2 && <3
     , recursion-schemes >=5.1.3 && <6
   default-language: Haskell2010
 
@@ -72,5 +76,6 @@ test-suite c4f-test
     , c4f
     , hedgehog >=1.0.3 && <2
     , lens >=4.18.1 && <5
+    , mtl >=2.2.2 && <3
     , recursion-schemes >=5.1.3 && <6
   default-language: Haskell2010
