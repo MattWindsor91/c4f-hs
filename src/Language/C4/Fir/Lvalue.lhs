@@ -28,7 +28,12 @@ Lvalues and addresses
 > where
 > import qualified Control.Lens as LL
 > import qualified Data.Functor.Foldable as F
-> import Language.C4.Fir.Id (Id, AsId, _Id, HasId, underlyingId)
+> import Language.C4.Fir.Id (Id, AsId, _Id, HasId, underlyingId, gen)
+
+We import `Hedgehog` to provide generators for lvalues and addresses.
+
+> import Hedgehog (MonadGen)
+> import qualified Hedgehog.Gen as G
 
 Lvalues
 -------
@@ -68,8 +73,7 @@ of getting the underlying identifier of an lvalue.
 >   where
 >     lvalueId' (VarF x) = Var <$> f x
 >     lvalueId' (DerefF x) = Deref <$> x
-
- > instance HasId Lvalue where underlyingId = lvalueId
+> instance HasId Lvalue where underlyingId = lvalueId
 
 Addresses
 ---------
@@ -85,7 +89,7 @@ An address is an identifier if it is `Lv (Var x)` for some `x`.
 
 > instance AsId Address where _Id = _Lv . _Var
 
-As with addresses, we define a base functor.
+As with addresses, we define a base functor for recursion.
 
 > data AddressF b
 >   = LvF Lvalue
@@ -103,14 +107,21 @@ As with addresses, we define a base functor.
 We could define `HasId` by composing a retrieval of the lvalue of an address
 and the variable of the lvalue, but this seems slightly more optimal:
 
- > addressId :: Lvalue -> Id
- > addressId = F.fold addressId'
- >   where addressId' (LvF x) = lvalueId x
- >         addressId' (DerefF x) = x
- > instance HasId Address where underlyingId = addressId
+> addressId :: LL.Lens' Address Id
+> addressId f = F.fold addressId'
+>   where addressId' (LvF x) = Lv <$> lvalueId f x
+>         addressId' (RefF x) = Ref <$> x
+> instance HasId Address where underlyingId = addressId
 
 Normalised addresses
 --------------------
+
+Addresses are not normalised by default: for instance, if `a` is a pointer,
+`a`, `&*a`, and `&&**a` all point to the same bit of memory.  This is an issue
+for things like modelling heaps as address maps.
+
+We introduce a type wrapper `NormAddress` that specifies that an address
+_is_ normalised.
 
 > -- | Normalised addresses.
 > newtype NormAddress = Norm Address
@@ -136,5 +147,34 @@ Any other reference of a normalised value is normalised.
 
 >     normalise' (RefF (Norm x)) = Norm (Ref (Ref x))
 
-Recursion schemes
------------------
+> -- | Forgets that a normalised address is normalised.
+> denormalise :: NormAddress -> Address
+> denormalise (Norm x) = x
+
+Generating lvalues and addresses
+--------------------------------
+
+We now give non-typesafe generators for lvalues and addresses.
+For each generator, we have two variants: a primed version that takes a
+particular sub-generator, and an unprimed one that bakes in the fully
+random generator chain.
+
+> -- | Generates random non-typesafe lvalues given an identifier generator.
+> genLvalue' :: MonadGen m => m Id -> m Lvalue
+> genLvalue' f = G.recursive G.choice
+>   [ Var <$> f ]
+>   [ G.subterm (genLvalue' f) Deref ]
+
+> -- | Generates random non-typesafe lvalues.
+> genLvalue :: MonadGen m => m Lvalue
+> genLvalue = genLvalue' gen
+
+> -- | Generates random non-typesafe addresses given an lvalue generator.
+> genAddress' :: MonadGen m => m Lvalue -> m Address
+> genAddress' f = G.recursive G.choice
+>   [ Lv <$> f ]
+>   [ G.subterm (genAddress' f) Ref ]
+
+> -- | Generates random non-typesafe addresses.
+> genAddress :: MonadGen m => m Address
+> genAddress = genAddress' genLvalue

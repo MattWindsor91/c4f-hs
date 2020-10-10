@@ -12,15 +12,18 @@ Identifiers
 > module Language.C4.Fir.Id
 >   ( Id
 >     -- Conversion to and from bytestrings
->   , fromBytes -- :: Data.Bytestring.Char8.ByteString -> Maybe Id
->   , toBytes -- :: Id -> Data.Bytestring.Char8.Bytestring
+>   , fromBytes -- :: Data.ByteString.Char8.ByteString -> Maybe Id
+>   , toBytes -- :: Id -> Data.ByteString.Char8.ByteString
 >     -- Optics
 >   , AsId -- typeclass
 >   , _Id -- :: AsId t => Control.Lens.Prism' t Id
+>   , bytes -- :: Control.Lens.Prism' Data.ByteString.Char8.ByteString Id
 >   , HasId -- :: typeclass
 >   , underlyingId -- :: HasId t => Control.Lens.Lens' t Id
 >     -- Generators
 >   , gen -- :: Hedgehog.Gen.MonadGen m => m Id
+>     -- Miscellaneous
+>   , isValid -- :: Data.ByteString.Char8.ByteString -> bool
 >   )
 > where
 > import Data.Char (isAlpha, isAlphaNum)
@@ -56,6 +59,12 @@ that obey their respective predicates.
 > genNonInitial :: MonadGen m => m Char
 > genNonInitial = G.choice [ G.alphaNum, return '_' ]
 
+> -- | Checks whether a bytestring is a valid identifier.
+> isValid :: C.ByteString -> Bool
+> isValid = any isValid' . C.uncons
+>   where
+>     isValid' (c, cs) = isValidInitial c && C.all isValidNonInitial cs
+
 The Id type
 -----------
 
@@ -72,13 +81,10 @@ We can convert an identifier to a bytestring just by removing its wrapper.
 > toBytes (Id x) = x
 
 Converting back is partial, because incoming bytestrings must obey the above
-invariants.
+invariant.
 
 > fromBytes :: C.ByteString -> Maybe Id
-> fromBytes x = C.uncons x >>= fromBytes'
->   where
->     fromBytes' (c, cs) | isValidInitial c && C.all isValidNonInitial cs = Just (Id x)
->     fromBytes' _ = Nothing
+> fromBytes x = if isValid x then Just (Id x) else Nothing
 
 Optics
 ------
@@ -120,7 +126,7 @@ Generating IDs
 > gen :: MonadGen m => m Id
 > gen = make <$> genInitial <*> genNonInitials
 >   where genNonInitials = C.pack <$> G.list range genNonInitial
->         range = R.linearBounded
+>         range = R.linear 0 100
 >         make i ns = Id (C.cons i ns)
 
 
