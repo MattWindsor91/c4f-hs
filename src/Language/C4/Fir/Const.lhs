@@ -15,15 +15,15 @@ Constants
 >   ( Const (Int, Bool)
 >     -- Lenses
 >   , AsConst
->   , _Const -- :: AsConst s => Prism' Const s
->   , _Int -- :: AsConst s => Prism' Integer s
->   , _Bool -- :: AsConst s => Prism' Bool s
+>   , _Const -- :: AsConst k => Prism' Const k
+>   , _Int -- :: AsConst k => Prism' Integer k
+>   , _Bool -- :: AsConst k => Prism' Bool k
 >     -- Convenience constructors
->   , int -- :: AsConst s => Integer -> s
->   , bool -- :: AsConst s => Bool -> s
->   , true -- :: AsConst s => s
->   , false -- :: AsConst s => s
->   , zero -- :: AsConst s => s
+>   , int -- :: AsConst k => Integer -> k
+>   , bool -- :: AsConst k => Bool -> k
+>   , true -- :: AsConst k => k
+>   , false -- :: AsConst k => k
+>   , zero -- :: AsConst k => k
 >   )
 > where
 > import Control.Lens (makeClassyPrisms, review)

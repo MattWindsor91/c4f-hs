@@ -55,7 +55,9 @@ For recursion, we define a base functor.
 >   = VarF Id
 >   | DerefF b
 >     deriving Functor
->
+
+The usual `recursion-schemes` boilerplate follows:
+
 > type instance F.Base Lvalue = LvalueF
 > instance F.Recursive Lvalue where
 >   project (Var v) = VarF v
@@ -95,7 +97,9 @@ As with addresses, we define a base functor for recursion.
 >   = LvF Lvalue
 >   | RefF b
 >     deriving Functor
->
+
+The usual `recursion-schemes` boilerplate follows:
+
 > type instance F.Base Address = AddressF
 > instance F.Recursive Address where
 >   project (Lv l) = LvF l

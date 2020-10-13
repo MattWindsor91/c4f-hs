@@ -16,6 +16,7 @@ Operators
 >   , LBop ((:&&), (:||))
 >   , RBop ((:<), (:<=), (:>), (:>=), (:==), (:!=))
 >   , Bop (Arith, Bitwise, Logical, Rel)
+>   , Uop (Not)
 >   )
 > where
 
@@ -69,4 +70,15 @@ Relational operators take two operands of the same type, and produce Booleans.
 >   | (:>=) -- ^ Greater-than-or-equal.
 >   | (:==) -- ^ Equal.
 >   | (:!=) -- ^ Not-equal.
+>     deriving (Eq, Show)
+
+Unary operators
+---------------
+
+There aren't enough unary operators to benefit from grouping, so we just have
+one linear enumeration.
+
+> -- Enumeration of all unary operators.
+> data Uop
+>   = Not -- ^ Logical negation.
 >     deriving (Eq, Show)

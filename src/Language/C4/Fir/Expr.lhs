@@ -1,7 +1,11 @@
 Expressions
 ===========
 
-> {-# LANGUAGE TemplateHaskell, TypeFamilies #-}
+> {-# LANGUAGE
+> DeriveFunctor,
+> TemplateHaskell,
+> TypeFamilies
+> #-}
 
 > {-|
 > Module      : Language.C4.Fir.Expr
@@ -36,7 +40,7 @@ Expressions
 > import Language.C4.Fir.Id (Id)
 > import Language.C4.Fir.Lvalue (Lvalue)
 > import Language.C4.Fir.Op
->   (ABop (..), BBop (..), LBop (..), RBop (..), Bop (..))
+>   (ABop (..), BBop (..), LBop (..), RBop (..), Bop (..), Uop (..) )
 
 Primitive expressions
 ---------------------
@@ -61,9 +65,10 @@ Top-level expressions
 
 > -- | Top-level expressions.
 > data Expr m
->   = Meta m (Expr m)
->   | Prim PrimExpr
->   | Bin Bop (Expr m) (Expr m)
+>   = Meta m (Expr m) -- ^ Wraps an expression in metadata.
+>   | Prim PrimExpr -- ^ Primitive expression.
+>   | Bin Bop (Expr m) (Expr m) -- ^ Binary operation.
+>   | Un Uop (Expr m) -- ^ Unary operation.
 >     deriving (Eq, Show)
 
 We don't make classy prisms for Exprs, because the introduction of the metadata
@@ -71,6 +76,8 @@ parameter causes the resulting class to be very unwieldy.  This may change in
 future if we really need it.
 
 > makePrisms ''Expr
+
+We can turn constant lenses on expressions that hold constants.
 
 > instance AsConst (Expr m) where
 >   _Const = _Prim . _Con
@@ -164,10 +171,27 @@ If we add multiplication, it goes here.
 Recursion schemes
 -----------------
 
+As usual, we define a 'base functor' for expressions, which is just the `Expr`
+type with all instances of recursion into `Expr` replaced with a new type
+parameter.
+
 > data ExprF m b
 >   = MetaF m b
 >   | PrimF PrimExpr
 >   | BinF Bop b b
+>   | UnF Uop b
+>     deriving Functor
+
+The usual `recursion-schemes` boilerplate follows:
 
 > type instance F.Base (Expr m) = ExprF m
-
+> instance F.Recursive (Expr m) where
+>   project (Meta m x) = MetaF m x
+>   project (Prim x) = PrimF x
+>   project (Bin o l r) = BinF o l r
+>   project (Un o x) = UnF o x
+> instance F.Corecursive (Expr m) where
+>   embed (MetaF m x) = Meta m x
+>   embed (PrimF x) = Prim x
+>   embed (BinF o l r) = Bin o l r
+>   embed (UnF o x) = Un o x
