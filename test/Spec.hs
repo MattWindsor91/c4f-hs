@@ -1,6 +1,7 @@
 import Control.Monad (unless)
 import System.Exit (exitFailure)
 import System.IO (stderr, stdout, BufferMode (LineBuffering), hSetBuffering)
+import Test.Fir.Const
 import Test.Fir.Id
 import Test.Fir.Lvalue
 
@@ -10,7 +11,8 @@ main = do
   hSetBuffering stderr LineBuffering
 
   results <- sequence
-    [ Test.Fir.Id.tests
+    [ Test.Fir.Const.tests
+    , Test.Fir.Id.tests
     , Test.Fir.Lvalue.tests
     ]
 

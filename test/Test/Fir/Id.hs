@@ -48,7 +48,7 @@ prop_bytesPrismLaw1 :: Property
 prop_bytesPrismLaw1 =
   onId (\x -> L.preview Src.bytes (L.review Src.bytes x) === Just x)
 
--- TODO(@MattWindsor91): second and third prism laws
+-- TODO(@MattWindsor91): these two properties discard a lot; why?
 
 prop_bytesPrismLaw2 :: Property
 prop_bytesPrismLaw2 = property $ do

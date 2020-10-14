@@ -131,8 +131,6 @@ heap with non-atomic semantics.
 Evaluating operators
 --------------------
 
-
-
 Evaluation errors
 -----------------
 

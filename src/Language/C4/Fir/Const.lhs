@@ -16,14 +16,17 @@ Constants
 >     -- Lenses
 >   , AsConst
 >   , _Const -- :: AsConst k => Prism' Const k
->   , _Int -- :: AsConst k => Prism' Integer k
+>   , _Int -- :: AsConst k => Prism' Int k
 >   , _Bool -- :: AsConst k => Prism' Bool k
 >     -- Convenience constructors
->   , int -- :: AsConst k => Integer -> k
+>   , int -- :: AsConst k => Int -> k
 >   , bool -- :: AsConst k => Bool -> k
 >   , true -- :: AsConst k => k
 >   , false -- :: AsConst k => k
 >   , zero -- :: AsConst k => k
+>     -- Coercion
+>   , coerceInt -- :: Const -> Int
+>   , coerceBool -- :: Const -> Bool
 >   )
 > where
 > import Control.Lens (makeClassyPrisms, review)
@@ -31,7 +34,7 @@ Constants
 Fir supports (signed) integer and Boolean ("true", "false") constants.
 
 > data Const
->   = Int Integer
+>   = Int Int
 >   | Bool Bool
 >     deriving (Eq, Show)
 
@@ -48,7 +51,7 @@ has a particular constant integer or Boolean value.  We define a few shorthand
 constructors on `AsConst` to make this easier.
 
 > -- | Lifts an integer to a constant (or constant expression).
-> int :: AsConst k => Integer -> k
+> int :: AsConst k => Int -> k
 > int = review _Int
 
 > -- | Constructs a constant zero.
@@ -66,3 +69,32 @@ constructors on `AsConst` to make this easier.
 > -- | Constructs a constant false.
 > false :: AsConst k => k
 > false = bool False
+
+Coercion
+--------
+
+The `coerceX` functions extract a particular type of constant from a constant
+value, using C11-type semantics.
+
+> -- | coerceBool coerces a constant to a Boolean value.
+> coerceBool :: Const -> Bool
+> coerceBool (Bool x) = x
+> coerceBool (Int x) = intToBool x
+
+> -- | coerceBool coerces a constant to an integer value.
+> coerceInt :: Const -> Int
+> coerceInt (Int x) = x
+> coerceInt (Bool x) = boolToInt x
+
+The general rule is that 0 is false and everything else is true; when converting
+integers to booleans, we further specificially map true to 1.
+
+> -- | intToBool interprets integers as Booleans using C11-type semantics.
+> intToBool :: Int -> Bool
+> intToBool 0 = False
+> intToBool _ = True
+
+> -- | boolToInt interprets Booleans as integers using C11-type semantics.
+> boolToInt :: Bool -> Int
+> boolToInt False = 0
+> boolToInt True = 1
