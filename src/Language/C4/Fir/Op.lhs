@@ -16,9 +16,16 @@ Operators
 >   , LBop ((:&&), (:||))
 >   , RBop ((:<), (:<=), (:>), (:>=), (:==), (:!=))
 >   , Bop (Arith, Bitwise, Logical, Rel)
->   , Uop (Not)
+>     -- Unary operators
+>   , Uop (Comp, Not)
+>     -- Semantics
+>   , semABop -- :: Int -> Int -> Int
+>   , semBBop -- :: Int -> Int -> Int
+>   , semLBop -- :: Bool -> Bool -> Bool
+>   , semRBop -- :: (Eq a, Ord a) -> a -> a -> Bool
 >   )
 > where
+> import Data.Bits ((.&.), (.|.), xor)
 
 Binary operators
 ----------------
@@ -42,6 +49,12 @@ Arithmetic operators take integers and produce integers.
 >   | (:-) -- ^ Subtraction.
 >     deriving (Eq, Show)
 
+The semantics is as follows:
+
+> semABop :: ABop -> Int -> Int -> Int
+> semABop (:+) = (+)
+> semABop (:-) = (-)
+
 Bitwise operators also take integers and produce integers, but operate on the
 bits of their operands.
 
@@ -52,6 +65,13 @@ bits of their operands.
 >   | (:^) -- ^ Bitwise XOR.
 >     deriving (Eq, Show)
 
+The semantics is as follows:
+
+> semBBop :: BBop -> Int -> Int -> Int
+> semBBop (:&) = (.&.)
+> semBBop (:|) = (.|.)
+> semBBop (:^) = xor
+
 Logical operators take Booleans and produce Booleans.
 
 > -- | Logical binary operators.
@@ -59,6 +79,12 @@ Logical operators take Booleans and produce Booleans.
 >   = (:&&) -- ^ Conjunction.
 >   | (:||) -- ^ Disjunction.
 >     deriving (Eq, Show)
+
+The semantics is as follows:
+
+> semLBop :: LBop -> Bool -> Bool -> Bool
+> semLBop (:&&) = (&&)
+> semLBop (:||) = (||)
 
 Relational operators take two operands of the same type, and produce Booleans.
 
@@ -72,6 +98,17 @@ Relational operators take two operands of the same type, and produce Booleans.
 >   | (:!=) -- ^ Not-equal.
 >     deriving (Eq, Show)
 
+The semantics is as follows.  Unlike most semantic functions, relationals are
+parametric over the type, so long as it is ordered with equality.
+
+> semRBop :: (Eq a, Ord a) => RBop -> a -> a -> Bool
+> semRBop (:<) = (<)
+> semRBop (:<=) = (<=)
+> semRBop (:>) = (<)
+> semRBop (:>=) = (>=)
+> semRBop (:==) = (==)
+> semRBop (:!=) = (/=)
+
 Unary operators
 ---------------
 
@@ -80,5 +117,9 @@ one linear enumeration.
 
 > -- Enumeration of all unary operators.
 > data Uop
->   = Not -- ^ Logical negation.
+>   = Comp -- ^ Bitwise complement.
+>   | Not -- ^ Logical negation.
 >     deriving (Eq, Show)
+
+We don't give the semantics of Uop here, as there are only two operators and
+they take different types.

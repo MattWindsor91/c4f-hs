@@ -17,7 +17,7 @@ Expressions
 > -}
 > module Language.C4.Fir.Expr
 >   ( Expr (Meta, Prim, Bin)
->   , PrimExpr (Con, Lv)
+>   , PrimExpr (Con, Addr)
 >     -- Binary operator shorthand
 >   , (@+) -- :: Expr m -> Expr m -> Expr m
 >   , (@-) -- :: Expr m -> Expr m -> Expr m
@@ -38,7 +38,7 @@ Expressions
 > import Data.Functor.Foldable as F
 > import Language.C4.Fir.Const (AsConst, Const, _Const)
 > import Language.C4.Fir.Id (Id)
-> import Language.C4.Fir.Lvalue (Lvalue)
+> import Language.C4.Fir.Lvalue (Address)
 > import Language.C4.Fir.Op
 >   (ABop (..), BBop (..), LBop (..), RBop (..), Bop (..), Uop (..) )
 
@@ -48,7 +48,7 @@ Primitive expressions
 > -- | Primitive expressions.
 > data PrimExpr
 >   = Con Const -- ^ A constant expression.
->   | Lv Lvalue -- ^ An lvalue expression.
+>   | Addr Address -- ^ An address expression.
 >     deriving (Eq, Show)
 
 There doesn't seem to be a good reason for PrimExprs to be classy.
