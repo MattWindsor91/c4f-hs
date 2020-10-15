@@ -23,12 +23,14 @@ of the Fir semantics).
 >   , SeqEval
 >   )
 > where
+> import qualified Data.Functor.Foldable as F
+> import Control.Applicative (liftA2)
 > import Control.Monad.Except (throwError)
 > import Control.Monad.State (StateT, gets, modify)
-> import Language.C4.Fir.Const (Const (..))
-> import Language.C4.Fir.Expr (Expr (..), PrimExpr (..) )
-> import Language.C4.Fir.Op
->   (semABop, semBBop, semLBop, semRBop, Bop (..), Uop (..))
+> import Data.Bits (complement)
+> import Language.C4.Fir.Const (Const (..), bool, int, coerceBool, coerceInt)
+> import Language.C4.Fir.Expr (Expr (..), ExprF (..), PrimExpr (..) )
+> import qualified Language.C4.Fir.Op as Op
 > import Language.C4.Fir.Lvalue (NormAddress, normalise)
 > import Language.C4.Fir.MemOrder (MemOrder (..))
 
@@ -113,6 +115,30 @@ We can define the various read-modify-write actions through loads and stores:
 >     then True <$ seqStore o d
 >     else False <$ seqStore e ov
 
+Evaluating expressions
+----------------------
+
+> -- | Evaluates an expression.
+> evalExpr :: MonadEval m => Expr a -> m Const
+
+We use a recursion-schemes fold, whereby at each step of evaluation we have
+reduced any sub-term into `m Const`: in other words, the raw computation that
+will result in a constant value if we evaluate it.  (We can't evaluate to a
+`Const` in a recursion because of short-circuiting in some operators.)
+
+> evalExpr = F.fold evalExpr'
+>   where
+
+Evaluation ignores metadata.
+
+>     evalExpr' (MetaF _ k) = k
+
+Every other leg delegates to several sub-evaluators we define below.
+
+>     evalExpr' (PrimF p) = evalPrim p
+>     evalExpr' (BinF o l r) = evalBop o l r
+>     evalExpr' (UnF o x) = evalUop o x
+
 Evaluating primitives
 ---------------------
 
@@ -131,9 +157,52 @@ heap with non-atomic semantics.
 Evaluating operators
 --------------------
 
+Arithmetic and bitwise operators map, purely, from integers to integers,
+so they share most of their boilerplate.
+
+> -- | Lifts a function from ints to ints into an evaluation over constants.
+> evalIntBop :: MonadEval m => (Int -> Int -> Int) -> m Const -> m Const -> m Const
+> evalIntBop f l r = int <$> liftA2 f (coerceInt <$> l) (coerceInt <$> r)
+
+> -- | Evaluates an arithmetic binary operation.
+> evalABop :: MonadEval m => Op.ABop -> m Const -> m Const -> m Const
+> evalABop = evalIntBop . Op.semABop
+
+> -- | Evaluates a bitwise binary operation.
+> evalBBop :: MonadEval m => Op.BBop -> m Const -> m Const -> m Const
+> evalBBop = evalIntBop . Op.semBBop
+
+Logical operations map from Booleans to Booleans, but carry through the monad,
+so as to allow for short-circuit evaluation.
+
+> -- | Evaluates a logical binary operation.
+> evalLBop :: MonadEval m => Op.LBop -> m Const -> m Const -> m Const
+> evalLBop o l r = bool <$> Op.semLBop o (coerceBool <$> l) (coerceBool <$> r)
+
+Finally, relational operations need a degree of agreement as to what the
+type is.  For now, we just coerce both sides to integers, as integers are a
+strict extension of booleans.
+
+> -- | Evaluates a relational binary operation.
+> evalRBop :: MonadEval m => Op.RBop -> m Const -> m Const -> m Const
+> evalRBop o l r = bool <$> liftA2 (Op.semRBop o) (coerceInt <$> l) (coerceInt <$> r)
+
+> -- | Evaluates a binary operator.
+> evalBop :: MonadEval m => Op.Bop -> m Const -> m Const -> m Const
+> evalBop (Op.Arith o) = evalABop o
+> evalBop (Op.Bitwise o) = evalBBop o
+> evalBop (Op.Logical o) = evalLBop o
+> evalBop (Op.Rel o) = evalRBop o
+
+> -- | Evaluates a unary operator.
+> evalUop :: MonadEval m => Op.Uop -> m Const -> m Const
+> evalUop Op.Comp = fmap (int . complement . coerceInt)
+> evalUop Op.Not = fmap (bool . not . coerceBool)
+
 Evaluation errors
 -----------------
 
+> -- | Enumeration of possible errors when evaluating an expression.
 > data EvalError
 >   = TypeError
 >   | VarError NormAddress

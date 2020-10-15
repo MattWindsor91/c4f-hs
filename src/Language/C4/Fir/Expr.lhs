@@ -16,8 +16,10 @@ Expressions
 > Stability   : experimental
 > -}
 > module Language.C4.Fir.Expr
->   ( Expr (Meta, Prim, Bin)
+>   ( Expr (Meta, Prim, Bin, Un)
 >   , PrimExpr (Con, Addr)
+>     -- Recursion schemes
+>   , ExprF (MetaF, PrimF, BinF, UnF)
 >     -- Binary operator shorthand
 >   , (@+) -- :: Expr m -> Expr m -> Expr m
 >   , (@-) -- :: Expr m -> Expr m -> Expr m
@@ -35,7 +37,7 @@ Expressions
 >   )
 > where
 > import Control.Lens (makePrisms, makeClassyPrisms)
-> import Data.Functor.Foldable as F
+> import qualified Data.Functor.Foldable as F
 > import Language.C4.Fir.Const (AsConst, Const, _Const)
 > import Language.C4.Fir.Id (Id)
 > import Language.C4.Fir.Lvalue (Address)

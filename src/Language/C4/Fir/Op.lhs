@@ -19,10 +19,10 @@ Operators
 >     -- Unary operators
 >   , Uop (Comp, Not)
 >     -- Semantics
->   , semABop -- :: Int -> Int -> Int
->   , semBBop -- :: Int -> Int -> Int
->   , semLBop -- :: Bool -> Bool -> Bool
->   , semRBop -- :: (Eq a, Ord a) -> a -> a -> Bool
+>   , semABop -- :: ABop -> Int -> Int -> Int
+>   , semBBop -- :: BBop -> Int -> Int -> Int
+>   , semLBop -- :: Monad m => LBop -> m Bool -> m Bool -> m Bool
+>   , semRBop -- :: (Eq a, Ord a) -> RBop -> a -> a -> Bool
 >   )
 > where
 > import Data.Bits ((.&.), (.|.), xor)
@@ -80,11 +80,18 @@ Logical operators take Booleans and produce Booleans.
 >   | (:||) -- ^ Disjunction.
 >     deriving (Eq, Show)
 
-The semantics is as follows:
+The semantics is as follows.  We parametrise the semantics over a monad, and
+this lets us capture the potential of short-circuiting evaluation.
 
-> semLBop :: LBop -> Bool -> Bool -> Bool
-> semLBop (:&&) = (&&)
-> semLBop (:||) = (||)
+> semLBop :: Monad m => LBop -> m Bool -> m Bool -> m Bool
+> semLBop (:&&) l r =
+>   do
+>     l' <- l
+>     if l' then (l' &&) <$> r else pure False
+> semLBop (:||) l r =
+>   do
+>     l' <- l
+>     if l' then pure True else (l' ||) <$> r
 
 Relational operators take two operands of the same type, and produce Booleans.
 
