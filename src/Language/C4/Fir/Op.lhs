@@ -111,7 +111,7 @@ parametric over the type, so long as it is ordered with equality.
 > semRBop :: (Eq a, Ord a) => RBop -> a -> a -> Bool
 > semRBop (:<) = (<)
 > semRBop (:<=) = (<=)
-> semRBop (:>) = (<)
+> semRBop (:>) = (>)
 > semRBop (:>=) = (>=)
 > semRBop (:==) = (==)
 > semRBop (:!=) = (/=)
