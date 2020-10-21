@@ -18,6 +18,8 @@ Operators
 >   , Bop (Arith, Bitwise, Logical, Rel)
 >     -- Unary operators
 >   , Uop (Comp, Not)
+>     -- Predicates
+>   , relIncl -- :: RBop -> RBop -> Bool
 >     -- Semantics
 >   , semABop -- :: ABop -> Int -> Int -> Int
 >   , semBBop -- :: BBop -> Int -> Int -> Int
@@ -41,13 +43,16 @@ and relational.
 >   | Rel RBop -- ^ A relational operator.
 >     deriving (Eq, Show)
 
+With all of the operator groupings, the order is arbitrary and only meaningful
+for situations such as building operator maps.
+
 Arithmetic operators take integers and produce integers.
 
 > -- | Arithmetic binary operators.
 > data ABop
 >   = (:+) -- ^ Addition.
 >   | (:-) -- ^ Subtraction.
->     deriving (Eq, Show)
+>     deriving (Eq, Ord, Show, Bounded, Enum)
 
 The semantics is as follows:
 
@@ -63,7 +68,7 @@ bits of their operands.
 >   = (:&) -- ^ Bitwise AND.
 >   | (:|) -- ^ Bitwise OR.
 >   | (:^) -- ^ Bitwise XOR.
->     deriving (Eq, Show)
+>     deriving (Eq, Ord, Show, Bounded, Enum)
 
 The semantics is as follows:
 
@@ -78,7 +83,7 @@ Logical operators take Booleans and produce Booleans.
 > data LBop
 >   = (:&&) -- ^ Conjunction.
 >   | (:||) -- ^ Disjunction.
->     deriving (Eq, Show)
+>     deriving (Eq, Ord, Show, Bounded, Enum)
 
 The semantics is as follows.  We parametrise the semantics over a monad, and
 this lets us capture the potential of short-circuiting evaluation.
@@ -103,7 +108,7 @@ Relational operators take two operands of the same type, and produce Booleans.
 >   | (:>=) -- ^ Greater-than-or-equal.
 >   | (:==) -- ^ Equal.
 >   | (:!=) -- ^ Not-equal.
->     deriving (Eq, Show)
+>     deriving (Eq, Ord, Show, Bounded, Enum)
 
 The semantics is as follows.  Unlike most semantic functions, relationals are
 parametric over the type, so long as it is ordered with equality.
@@ -116,6 +121,29 @@ parametric over the type, so long as it is ordered with equality.
 > semRBop (:==) = (==)
 > semRBop (:!=) = (/=)
 
+> {- | True if, and only if, the LHS relation includes the RHS relation. -}
+> relIncl :: RBop -> RBop -> Bool
+
+Reflexive cases first:
+
+> relIncl (:<) (:<) = True
+> relIncl (:<=) (:<=) = True
+> relIncl (:>) (:>) = True
+> relIncl (:>=) (:>=) = True
+> relIncl (:==) (:==) = True
+> relIncl (:!=) (:!=) = True
+
+These operators are composites of other relations:
+
+> relIncl (:<=) (:<) = True
+> relIncl (:<=) (:==) = True
+> relIncl (:>=) (:>) = True
+> relIncl (:>=) (:==) = True
+
+Other cases are invalid:
+
+> relIncl _ _ = False
+
 Unary operators
 ---------------
 
@@ -126,7 +154,7 @@ one linear enumeration.
 > data Uop
 >   = Comp -- ^ Bitwise complement.
 >   | Not -- ^ Logical negation.
->     deriving (Eq, Show)
+>     deriving (Eq, Ord, Show, Bounded, Enum)
 
 We don't give the semantics of Uop here, as there are only two operators and
 they take different types.

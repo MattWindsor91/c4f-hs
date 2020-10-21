@@ -22,6 +22,7 @@ description:         Please see the README on GitHub at <https://github.com/Matt
 dependencies:
 - base >= 4.7 && < 5
 - bytestring >= 0.10.10.1 && < 0.11
+- containers >= 0.6.2.1 && < 0.7
 - hedgehog >= 1.0.3 && < 2
 - lens >= 4.18.1 && < 5
 - mtl >= 2.2.2 && < 3

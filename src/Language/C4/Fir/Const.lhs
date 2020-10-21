@@ -32,11 +32,14 @@ Constants
 > import Control.Lens (makeClassyPrisms, review)
 
 Fir supports (signed) integer and Boolean ("true", "false") constants.
+These are ordered, though the order only makes intuitive sense in terms of
+comparing constants of the same type; it mainly exists to let us use constants
+as keys.
 
 > data Const
->   = Int Int
->   | Bool Bool
->     deriving (Eq, Show)
+>   = Bool Bool
+>   | Int Int
+>     deriving (Eq, Ord, Show)
 
 This TemplateHaskell incantation gives us an `AsConst` type class which we
 can use to manipulate larger expression types as if they are `Const`.
