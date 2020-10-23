@@ -12,23 +12,24 @@ Constants
 > Stability   : experimental
 > -}
 > module Language.C4.Fir.Const
->   ( Const (Int, Bool)
+>   ( Const (I32, Bool)
 >     -- Lenses
 >   , AsConst
 >   , _Const -- :: AsConst k => Prism' Const k
->   , _Int -- :: AsConst k => Prism' Int k
+>   , _I32 -- :: AsConst k => Prism' I32 k
 >   , _Bool -- :: AsConst k => Prism' Bool k
 >     -- Convenience constructors
->   , int -- :: AsConst k => Int -> k
+>   , i32 -- :: AsConst k => Int32 -> k
 >   , bool -- :: AsConst k => Bool -> k
 >   , true -- :: AsConst k => k
 >   , false -- :: AsConst k => k
 >   , zero -- :: AsConst k => k
 >     -- Coercion
->   , coerceInt -- :: Const -> Int
+>   , coerceI32 -- :: Const -> Int32
 >   , coerceBool -- :: Const -> Bool
 >   )
 > where
+> import Data.Int (Int32)
 > import Control.Lens (makeClassyPrisms, review)
 
 Fir supports (signed) integer and Boolean ("true", "false") constants.
@@ -37,8 +38,8 @@ comparing constants of the same type; it mainly exists to let us use constants
 as keys.
 
 > data Const
->   = Bool Bool
->   | Int Int
+>   = Bool Bool -- ^ Booleans.
+>   | I32 Int32 -- ^ 32-bit integers.
 >     deriving (Eq, Ord, Show)
 
 This TemplateHaskell incantation gives us an `AsConst` type class which we
@@ -53,13 +54,13 @@ We often want to build a constant, primitive expression, or expression that
 has a particular constant integer or Boolean value.  We define a few shorthand
 constructors on `AsConst` to make this easier.
 
-> -- | Lifts an integer to a constant (or constant expression).
-> int :: AsConst k => Int -> k
-> int = review _Int
+> -- | Lifts a 32-bit integer to a constant (or constant expression).
+> i32 :: AsConst k => Int32 -> k
+> i32 = review _I32
 
 > -- | Constructs a constant zero.
 > zero :: AsConst k => k
-> zero = int 0
+> zero = i32 0
 
 > -- | Lifts a Boolean to a constant (or constant expression).
 > bool :: AsConst k => Bool -> k
@@ -82,22 +83,23 @@ value, using C11-type semantics.
 > -- | coerceBool coerces a constant to a Boolean value.
 > coerceBool :: Const -> Bool
 > coerceBool (Bool x) = x
-> coerceBool (Int x) = intToBool x
+> coerceBool (I32 x) = intToBool x
 
 > -- | coerceBool coerces a constant to an integer value.
-> coerceInt :: Const -> Int
-> coerceInt (Int x) = x
-> coerceInt (Bool x) = boolToInt x
+> coerceI32 :: Const -> Int32
+> coerceI32 (I32 x) = x
+> coerceI32 (Bool x) = boolToInt x
 
 The general rule is that 0 is false and everything else is true; when converting
 integers to booleans, we further specificially map true to 1.
 
-> -- | intToBool interprets integers as Booleans using C11-type semantics.
-> intToBool :: Int -> Bool
-> intToBool 0 = False
-> intToBool _ = True
+> -- | intToBool interprets integers of any width as Booleans,
+> --   using C11-style semantics.
+> intToBool :: (Num a, Eq a) => a -> Bool
+> intToBool = (/= 0)
 
-> -- | boolToInt interprets Booleans as integers using C11-type semantics.
-> boolToInt :: Bool -> Int
+> -- | boolToInt interprets Booleans as integers of any width,
+> --   using C11-style semantics.
+> boolToInt :: Num a => Bool -> a
 > boolToInt False = 0
 > boolToInt True = 1

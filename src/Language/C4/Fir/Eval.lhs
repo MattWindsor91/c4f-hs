@@ -28,7 +28,9 @@ of the Fir semantics).
 > import Control.Monad.Except (throwError)
 > import Control.Monad.State (StateT, gets, modify)
 > import Data.Bits (complement)
-> import Language.C4.Fir.Const (Const (..), bool, int, coerceBool, coerceInt)
+> import Data.Int (Int32)
+> import Data.Function (on)
+> import Language.C4.Fir.Const (Const (..), bool, i32, coerceBool, coerceI32)
 > import Language.C4.Fir.Expr (Expr (..), ExprF (..), PrimExpr (..) )
 > import qualified Language.C4.Fir.Op as Op
 > import Language.C4.Fir.Lvalue (NormAddress, normalise)
@@ -160,32 +162,41 @@ Evaluating operators
 Arithmetic and bitwise operators map, purely, from integers to integers,
 so they share most of their boilerplate.
 
-> -- | Lifts a function from ints to ints into an evaluation over constants.
-> evalIntBop :: MonadEval m => (Int -> Int -> Int) -> m Const -> m Const -> m Const
-> evalIntBop f l r = int <$> liftA2 f (coerceInt <$> l) (coerceInt <$> r)
+> -- | Provides the main shape of a binary operator evaluator.
+> evalBopGen
+>   :: MonadEval m
+>   => (Const -> a)             -- ^ A lifter for argument constants.
+>   -> (b -> Const)             -- ^ An unlifter for the final value.
+>   -> (m a -> m a -> m b)      -- ^ The semantics of the operator.
+>   -> m Const                  -- ^ The left argument.
+>   -> m Const                  -- ^ The right argument.
+>   -> m Const                  -- ^ The final result.
+> evalBopGen arg res f = evalBopGen' `on` (arg <$>)
+>   where evalBopGen' l r = res <$> f l r
 
 > -- | Evaluates an arithmetic binary operation.
 > evalABop :: MonadEval m => Op.ABop -> m Const -> m Const -> m Const
-> evalABop = evalIntBop . Op.semABop
+> evalABop = evalBopGen coerceI32 i32 . liftA2 . Op.semABop
 
 > -- | Evaluates a bitwise binary operation.
 > evalBBop :: MonadEval m => Op.BBop -> m Const -> m Const -> m Const
-> evalBBop = evalIntBop . Op.semBBop
+> evalBBop = evalBopGen coerceI32 i32 . liftA2 . Op.semBBop
 
 Logical operations map from Booleans to Booleans, but carry through the monad,
 so as to allow for short-circuit evaluation.
 
 > -- | Evaluates a logical binary operation.
 > evalLBop :: MonadEval m => Op.LBop -> m Const -> m Const -> m Const
-> evalLBop o l r = bool <$> Op.semLBop o (coerceBool <$> l) (coerceBool <$> r)
+> evalLBop = evalBopGen coerceBool bool . Op.semLBop
 
 Finally, relational operations need a degree of agreement as to what the
-type is.  For now, we just coerce both sides to integers, as integers are a
-strict extension of booleans.
+type is.  For now, we just coerce both sides to Int32, as it forms a
+strict extension of booleans; if we get multiple bit widths, we may need to
+rethink this.
 
 > -- | Evaluates a relational binary operation.
 > evalRBop :: MonadEval m => Op.RBop -> m Const -> m Const -> m Const
-> evalRBop o l r = bool <$> liftA2 (Op.semRBop o) (coerceInt <$> l) (coerceInt <$> r)
+> evalRBop = evalBopGen coerceI32 bool . liftA2 . Op.semRBop
 
 > -- | Evaluates a binary operator.
 > evalBop :: MonadEval m => Op.Bop -> m Const -> m Const -> m Const
@@ -196,7 +207,7 @@ strict extension of booleans.
 
 > -- | Evaluates a unary operator.
 > evalUop :: MonadEval m => Op.Uop -> m Const -> m Const
-> evalUop Op.Comp = fmap (int . complement . coerceInt)
+> evalUop Op.Comp = fmap (i32 . complement . coerceI32)
 > evalUop Op.Not = fmap (bool . not . coerceBool)
 
 Evaluation errors

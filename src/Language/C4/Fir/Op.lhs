@@ -21,13 +21,13 @@ Operators
 >     -- Predicates
 >   , relIncl -- :: RBop -> RBop -> Bool
 >     -- Semantics
->   , semABop -- :: ABop -> Int -> Int -> Int
->   , semBBop -- :: BBop -> Int -> Int -> Int
+>   , semABop -- :: Num a => ABop -> a -> a -> a
+>   , semBBop -- :: Bits a => BBop -> a -> a -> a
 >   , semLBop -- :: Monad m => LBop -> m Bool -> m Bool -> m Bool
 >   , semRBop -- :: (Eq a, Ord a) -> RBop -> a -> a -> Bool
 >   )
 > where
-> import Data.Bits ((.&.), (.|.), xor)
+> import Data.Bits (Bits, (.&.), (.|.), xor)
 
 Binary operators
 ----------------
@@ -54,9 +54,9 @@ Arithmetic operators take integers and produce integers.
 >   | (:-) -- ^ Subtraction.
 >     deriving (Eq, Ord, Show, Bounded, Enum)
 
-The semantics is as follows:
+The semantics, defined over any integer type, is as follows:
 
-> semABop :: ABop -> Int -> Int -> Int
+> semABop :: Num a => ABop -> a -> a -> a
 > semABop (:+) = (+)
 > semABop (:-) = (-)
 
@@ -70,9 +70,9 @@ bits of their operands.
 >   | (:^) -- ^ Bitwise XOR.
 >     deriving (Eq, Ord, Show, Bounded, Enum)
 
-The semantics is as follows:
+The semantics, defined over any bitwise type, is as follows:
 
-> semBBop :: BBop -> Int -> Int -> Int
+> semBBop :: Bits a => BBop -> a -> a -> a
 > semBBop (:&) = (.&.)
 > semBBop (:|) = (.|.)
 > semBBop (:^) = xor
