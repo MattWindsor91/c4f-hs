@@ -122,10 +122,10 @@ up and dowh map.
 > data Rule o i = (:->) (Head o i) Term
 
 > -- | A rule can be seen as a term-head pair.
-> _rule :: Iso' (Rule o i) (Term, (Head o i))
+> _rule :: Iso' (Rule o i) (Term, Head o i)
 > _rule = iso fromRule toRule
 >   where fromRule (h :-> t) = (t, h)
->         toRule (t, h) = (h :-> t)
+>         toRule (t, h) = h :-> t
 
 > -- | Views a rule list as a list of term-head pairs.
 > ruleAssoc :: [Rule o i] -> [(Term, Head o i)]
@@ -175,9 +175,15 @@ We now have the actual rule tables for each operator.
 > bitwiseRules :: RuleSet Op.BBop (Term, Term)
 > bitwiseRules = rules
 >   [ [(Op.:&), (Op.:|)] & refl
->   , [(Op.:&)]          & eitherSide K.zero @-> K.zero
->   , [(Op.:|), (Op.:^)] & eitherSide K.zero @-> X
->   , [(Op.:^)]          & X `op` X          @-> K.zero
+>   , [(Op.:&)]          & eitherSide K.zero       @-> K.zero
+>   , [(Op.:|), (Op.:^)] & eitherSide K.zero       @-> X
+>   , [(Op.:^)]          & X `op` X                @-> K.zero
+
+This rule relies on twos-complement arithmetic to hold, which is a little
+nonstandard, but should hold for any target architecture our fuzzer output will
+build for.
+
+>   , [(Op.:&)]          & eitherSide (K.i32 (-1)) @-> X
 >   ]
 
 > -- | Rule table for logical binary operators.
