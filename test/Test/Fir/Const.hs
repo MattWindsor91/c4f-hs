@@ -16,14 +16,14 @@ import Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Language.C4.Fir.Const as Src
 
-{- | Converting a Boolean to an integer and back is the identity.
+{- | Converting a Boolean to a 32-bit integer and back is the identity.
      (The opposite is not necessarily true, eg -1 will come back as 1.) -}
 prop_coerceBoolIntTrip :: Property
 prop_coerceBoolIntTrip = property $
-  forAll Gen.bool >>= \x -> tripping x boolInt intBool
+  forAll Gen.bool >>= \x -> tripping x boolI32 i32Bool
   where
-    boolInt = Src.coerceInt . L.review Src._Bool
-    intBool = L.Identity . Src.coerceBool . L.review Src._Int
+    boolI32 = Src.coerceI32 . L.review Src._Bool
+    i32Bool = L.Identity . Src.coerceBool . L.review Src._I32
 
 tests :: IO Bool
 tests =

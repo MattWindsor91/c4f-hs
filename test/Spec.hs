@@ -4,6 +4,7 @@ import System.IO (stderr, stdout, BufferMode (LineBuffering), hSetBuffering)
 import Test.Fir.Const
 import Test.Fir.Id
 import Test.Fir.Lvalue
+import Test.Fir.OpAlgebra
 
 main :: IO ()
 main = do
@@ -14,6 +15,7 @@ main = do
     [ Test.Fir.Const.tests
     , Test.Fir.Id.tests
     , Test.Fir.Lvalue.tests
+    , Test.Fir.OpAlgebra.tests
     ]
 
   unless (and results) exitFailure

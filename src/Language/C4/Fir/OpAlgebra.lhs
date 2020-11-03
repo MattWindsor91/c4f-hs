@@ -11,7 +11,12 @@ be of the form `x OP x` (two equivalent expressions), `k OP x` (left is a
 constant), or `x OP k` (right is a constant).  The output `out(x)` is either
 `x` or `k`.
 
-> {-# LANGUAGE TemplateHaskell #-}
+> {-# LANGUAGE DeriveFoldable
+>            , DeriveFunctor
+>            , DeriveTraversable
+>            , TemplateHaskell
+>            , TupleSections
+>            , NamedFieldPuns #-}
 
 > {-|
 > Module      : Language.C4.Fir.OpAlgebra
@@ -22,27 +27,36 @@ constant), or `x OP k` (right is a constant).  The output `out(x)` is either
 > Stability   : experimental
 > -}
 > module Language.C4.Fir.OpAlgebra
->   ( Term (X, K)
->   , RuleSet
+>   ( -- Terms
+>     Term (X, K)
+>   , subst          -- :: K.AsConst x => x -> Term -> x
+>   , fill           -- :: (K.AsConst x, Traversable t) => NonEmpty x -> t Term -> t x
 >     -- Rule sets
->   , arithRules   -- :: RuleSet ABop (Term, Term)
->   , bitwiseRules -- :: RuleSet BBop (Term, Term)
->   , logicalRules -- :: RuleSet LBop (Term, Term)
->   , relRules     -- :: RuleSet RBop (Term, Term)
+>   , RuleSet
+>   , arithRules     -- :: RuleSet ABop (Term, Term)
+>   , bitwiseRules   -- :: RuleSet BBop (Term, Term)
+>   , logicalRules   -- :: RuleSet LBop (Term, Term)
+>   , relRules       -- :: RuleSet RBop (Term, Term)
+>     -- Rule operations
+>   , allRules       -- :: RuleSet o i -> [(o, i, Term)]
+>   , rulesForOutput -- :: RuleSet o i -> Term -> [(o, i)]
 >   )
 > where
+> import Control.Applicative (liftA2, liftA3)
 > import Data.Function ((&))
+> import Data.Traversable (mapAccumL)
 > import qualified Data.Map as Map
+> import qualified Data.List.NonEmpty as NE
 > import Control.Lens
->   ( (^..)
+>   ( (<.>)
+>   , (#) -- review
 >   , Iso'
 >   , each
->   , iconcatMapOf
 >   , ifolded
+>   , ifoldMapOf
 >   , iso
 >   , ix
 >   , makePrisms
->   , over
 >   , toListOf
 >   )
 > import qualified Language.C4.Fir.Const as K
@@ -61,35 +75,62 @@ Terms
 Implementing `AsConst` here gives us free access to various convenience
 constructors.
 
-> instance K.AsConst Term where
->   _Const = _K
+> instance K.AsConst Term where _Const = _K
 
-Inputs
-------
+When we have `Term`s in a rule, we generally need to eliminate them by
+substituting expressions for `X` terms.  The `subst` function handles this:
 
-Usually, we handle inputs in terms of lists of inputs (for unary operators)
-and input pairs (for binary operators).
+> -- | Substitutes an expression into a term if it is X;
+> --   otherwise, evaluates to its constant as an expression.
+> subst :: K.AsConst x => x -> Term -> x
+> subst x X     = x
+> subst _ (K k) = K._Const#k
+
+Binary input specifications
+---------------------------
+
+While `Term` and `subst` is useful for dealing with inputs to unary operators,
+binary operators take pairs of inputs, and we need to be able to substitute
+across both simultaneously (with one or more 
 
 > -- | Type of input specification for binary inputs.
-> type BInSpec = [(Term, Term)]
+> data BIn a =
+>   BIn
+>     { lhs :: a -- ^ The left-hand side of the input specification.
+>     , rhs :: a -- ^ The right-hand side of the input specification.
+>     }
+>   deriving (Functor, Foldable, Traversable)
+
+If we have an input 
+
+> -- | Fills an input specification, replacing each X-term with an expression
+> --   in the given list.  The i-th expression replaces, if appropriate, the
+> --   i-th term, with the list being cycled infinitely if needed.
+> fill :: (K.AsConst x, Traversable t) => NE.NonEmpty x -> t Term -> t x
+
+Since the input list is cycled infinitely, `fromList` should be safe here:
+
+> fill inputs = snd . mapAccumL fillStep (NE.cycle inputs)
+>   where fillStep (x NE.:| xs) = (NE.fromList xs ,) . subst x
 
 We define a few standard functions for expressing common input specifications.
 These return lists and take position lists, because that makes
 combinators like `anyPos` work better.
 
 > -- | l `op` r is convenient shorthand for a position-dependent input spec.
-> op :: Term -> Term -> BInSpec
-> op l r = [(l, r)]
+> op :: Term -> Term -> [BIn Term]
+> op lhs rhs = [BIn {lhs, rhs}]
 
 > -- | Appends the flipped version of an input specification.
-> comm :: BInSpec -> BInSpec
+> comm :: [BIn Term] -> [BIn Term]
 > comm = (>>= commOne)
 >   where
->     commOne (l, r) | l == r = [(l, r)]
->     commOne (l, r) = [(l, r), (r, l)]
+>     commOne (BIn {lhs, rhs})
+>       | lhs == rhs = lhs `op` rhs
+>       | otherwise  = [ BIn {lhs, rhs}, BIn {lhs=rhs, rhs=lhs} ]
 
 > -- | Expands to the rules (t op X) and (X op t) where t is the input term.
-> eitherSide :: Term -> BInSpec
+> eitherSide :: Term -> [BIn Term]
 > eitherSide = comm . (X `op`)
 
 Rules
@@ -138,6 +179,12 @@ it lets us write `[ operators ] & input @-> output`.
 > (@->) :: Ord o => [i] -> Term -> [o] -> Rule o i
 > (@->) ins out ops = singleHead ops ins :-> out
 
+This is how we encode the common rule of reflexivity:
+
+> -- | Encodes a reflexivity rule.
+> refl :: Ord o => [o] -> Rule o (BIn Term)
+> refl ops = ops & X `op` X @-> X
+
 Rule sets
 ---------
 
@@ -152,19 +199,13 @@ provide a smart constructor.
 > rules :: Ord o => [Rule o i] -> RuleSet o i
 > rules = RuleSet . Map.fromListWith mergeHeads . ruleAssoc
 
-Reflexivity is a common rule:
-
-> -- | Encodes a reflexivity rule.
-> refl :: Ord o => [o] -> Rule o (Term, Term)
-> refl ops = ops & X `op` X @-> X
-
 Rule tables
 -----------
 
 We now have the actual rule tables for each operator.
 
 > -- | Rule table for arithmetic binary operators.
-> arithRules :: RuleSet Op.ABop (Term, Term)
+> arithRules :: RuleSet Op.ABop (BIn Term)
 > arithRules = rules
 >   [ [(Op.:+)] & eitherSide K.zero @-> X
 >   , [(Op.:-)] & X `op` K.zero     @-> X 
@@ -172,7 +213,7 @@ We now have the actual rule tables for each operator.
 >   ]
 
 > -- | Rule table for bitwise binary operators.
-> bitwiseRules :: RuleSet Op.BBop (Term, Term)
+> bitwiseRules :: RuleSet Op.BBop (BIn Term)
 > bitwiseRules = rules
 >   [ [(Op.:&), (Op.:|)] & refl
 >   , [(Op.:&)]          & eitherSide K.zero       @-> K.zero
@@ -187,7 +228,7 @@ build for.
 >   ]
 
 > -- | Rule table for logical binary operators.
-> logicalRules :: RuleSet Op.LBop (Term, Term)
+> logicalRules :: RuleSet Op.LBop (BIn Term)
 > logicalRules = rules
 >   [ [(Op.:&&), (Op.:||)] & refl
 >   , [(Op.:&&)]           & eitherSide K.false @-> K.false 
@@ -200,10 +241,10 @@ Relational rules boil down, for now, to reflexivity: any relation that implies
 `==` has the rule `x OP x == true`; the others, `x OP x == false`.
 
 > -- | relRules is the rule table for relational operators.
-> relRules :: RuleSet Op.RBop (Term, Term)
+> relRules :: RuleSet Op.RBop (BIn Term)
 > relRules = rules (map ruleFor (enumFrom minBound))
 >   where
->     ruleFor :: Op.RBop -> Rule Op.RBop (Term, Term)
+>     ruleFor :: Op.RBop -> Rule Op.RBop (BIn Term)
 >     ruleFor o = [o] & X `op` X @-> K.bool (Op.relIncl o (Op.:==))
 
 Using rule tables
@@ -213,6 +254,33 @@ We don't expose the internal representation of the rule tables, to let us
 further optimise them later.  Instead, we have a few combinators for looking
 up rules.
 
-> inputsFor :: RuleSet o i -> Term -> [(o, i)]
-> inputsFor (RuleSet tm) inp = iconcatMapOf (ix inp . _Head . ifolded) zip tm
+The usual thing to do with a ruleset is to call up the entire list of possible
+operators and input specifications.
 
+> -- | Given a ruleset and a desired output, get the list of operator-input
+> --   terms that result in that output.
+> rulesForOutput :: RuleSet o i -> Term -> [(o, i)]
+> rulesForOutput (RuleSet tm) inp = ifoldMapOf fold prod tm
+>   where fold = ix inp . _Head . ifolded
+
+Since we want every pair of operator and input specification, we need a
+Cartesian product, not a zip.  Here is a Cartesian product (for lack of
+better library definition we can use):
+
+> -- | Cartesian product.
+> prod :: [a] -> [b] -> [(a, b)]
+> prod = liftA2 (,)
+
+Sometimes (usually for testing) we want to get every rule out of a rule set.
+This effectively involves turning the internal representation of the set back
+into lists.
+
+> allRules :: RuleSet o i -> [(o, i, Term)]
+
+`allRules` is similar to `rulesForOutput`, except that, instead of taking one
+term and using it to index into the outer map, we pull the indices of the
+outer map into the fold over the inner maps using lens magic, and adjust the
+product accordingly.
+
+> allRules (RuleSet tm) = ifoldMapOf (ifolded <.> _Head . ifolded) prodTerm tm
+>   where prodTerm (out, ops) ins = liftA3 (,,) ops ins [out]
