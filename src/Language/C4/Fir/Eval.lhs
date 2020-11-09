@@ -19,14 +19,28 @@ of the Fir semantics).
 > Stability   : experimental
 > -}
 > module Language.C4.Fir.Eval
->   ( MonadEval
+>   ( MonadEval (load, store, rmw, cmpxchg)
+>   , evalExpr
+>   , seqEvalExpr
+>   , seqEvalExpr'
+>     -- Heaps
+>   , Heap
+>   , empty
+>   , update
+>     -- Sequential evaluation monad
 >   , SeqEval
+>   , seqLoad
+>   , seqStore
+>   , seqRmw
+>   , seqCmpxchg
+>     -- Error
+>   , EvalError (VarError)
 >   )
 > where
 > import qualified Data.Functor.Foldable as F
 > import Control.Applicative (liftA2)
 > import Control.Monad.Except (throwError)
-> import Control.Monad.State (StateT, gets, modify)
+> import Control.Monad.State (StateT, gets, modify, runStateT, evalStateT)
 > import Data.Bits (complement)
 > import Data.Int (Int32)
 > import Data.Function (on)
@@ -141,6 +155,16 @@ Every other leg delegates to several sub-evaluators we define below.
 >     evalExpr' (BinF o l r) = evalBop o l r
 >     evalExpr' (UnF o x) = evalUop o x
 
+> -- | Evaluates an expression in a sequential heap,
+> --   returning the new heap and constant final value on success.
+> seqEvalExpr' :: Expr a -> Heap -> Either EvalError (Const, Heap)
+> seqEvalExpr' = runStateT . evalExpr
+
+> -- | Evaluates an expression in a sequential heap,
+> --   returning the constant final value on success.
+> seqEvalExpr :: Expr a -> Heap -> Either EvalError Const
+> seqEvalExpr = evalStateT . evalExpr
+
 Evaluating primitives
 ---------------------
 
@@ -215,5 +239,5 @@ Evaluation errors
 
 > -- | Enumeration of possible errors when evaluating an expression.
 > data EvalError
->   = TypeError
->   | VarError NormAddress
+>   = VarError NormAddress
+>     deriving (Eq, Show)

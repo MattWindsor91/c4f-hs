@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
+--------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Const
 -- Description : C4 Fuzzable Internal Representation: Constants
@@ -13,7 +14,7 @@
 -- The general rule for Boolean coersion is that 0 is false and everything else
 -- is true; when converting integers to booleans, we further specificially map
 -- true to 1.
-
+--------------------------------------------------------------------------------
 
 module Language.C4.Fir.Const
   ( Const (I32, Bool)
@@ -31,10 +32,15 @@ module Language.C4.Fir.Const
     -- * Coercion
   , coerceI32
   , coerceBool
+    -- * Generators
+  , gen
   ) where
 
 import Data.Int (Int32)
 import Control.Lens (makeClassyPrisms, review)
+import Hedgehog (MonadGen)
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 -- | Fir constants.
 --
@@ -50,6 +56,10 @@ data Const
 -- This TemplateHaskell incantation gives us an `AsConst` type class which we
 -- can use to manipulate larger expression types as if they are `Const`.
 makeClassyPrisms ''Const
+
+{-
+ - Convenience constructors
+ -}
 
 -- | Lifts a 32-bit integer to a constant (or constant expression).
 i32 :: AsConst k => Int32 -> k
@@ -71,6 +81,10 @@ true = bool True
 false :: AsConst k => k
 false = bool False
 
+{-
+ - C11-semantics coersion
+ -}
+
 -- | Coerces a constant to a Boolean value, using C11-style semantics.
 coerceBool :: Const -> Bool
 coerceBool (Bool x) = x
@@ -89,3 +103,19 @@ intToBool = (/= 0)
 boolToInt :: Num a => Bool -> a
 boolToInt False = 0
 boolToInt True  = 1
+
+{-
+ - Generators
+ -}
+
+-- | Generates random constants or constant expressions using the given integer
+--   ranges.
+--
+--   This generator shrinks towards false for Booleans, and the origin for 
+--   integers (typically 0).
+gen :: (AsConst k, MonadGen m)
+    => Range.Range Int32 -- ^ Range to use for I32.
+    -> m k               -- ^ The generator monad.
+gen r32 = Gen.choice [ i32 <$> Gen.int32 r32
+                     , bool <$> Gen.bool
+                     ]

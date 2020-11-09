@@ -21,22 +21,26 @@ Expressions
 >     -- Recursion schemes
 >   , ExprF (MetaF, PrimF, BinF, UnF)
 >     -- Binary operator shorthand
+>   , arith
 >   , (@+) -- :: Expr m -> Expr m -> Expr m
 >   , (@-) -- :: Expr m -> Expr m -> Expr m
+>   , rel
 >   , (@<) -- :: Expr m -> Expr m -> Expr m
 >   , (@<=) -- :: Expr m -> Expr m -> Expr m
 >   , (@>) -- :: Expr m -> Expr m -> Expr m
 >   , (@>=) -- :: Expr m -> Expr m -> Expr m
 >   , (@==) -- :: Expr m -> Expr m -> Expr m
 >   , (@!=) -- :: Expr m -> Expr m -> Expr m
+>   , bitwise
 >   , (@&) -- :: Expr m -> Expr m -> Expr m
 >   , (@^) -- :: Expr m -> Expr m -> Expr m
 >   , (@|) -- :: Expr m -> Expr m -> Expr m
+>   , logical
 >   , (@&&) -- :: Expr m -> Expr m -> Expr m
 >   , (@||) -- :: Expr m -> Expr m -> Expr m
 >   )
 > where
-> import Control.Lens (makePrisms, makeClassyPrisms)
+> import Control.Lens (makePrisms)
 > import qualified Data.Functor.Foldable as F
 > import Language.C4.Fir.Const (AsConst, Const, _Const)
 > import Language.C4.Fir.Id (Id)

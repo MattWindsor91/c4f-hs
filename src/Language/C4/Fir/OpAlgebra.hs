@@ -1,6 +1,4 @@
-{-# LANGUAGE DeriveFoldable
-           , DeriveFunctor
-           , DeriveTraversable
+{-# LANGUAGE DeriveTraversable
            , TemplateHaskell
            , TupleSections
            , NamedFieldPuns #-}
@@ -29,6 +27,9 @@ module Language.C4.Fir.OpAlgebra
     Term (X, K)
   , subst
   , fill
+    -- Input specifications
+  , BIn (BIn, lhs, rhs)
+  , onBIn
     -- Rule sets
   , RuleSet
   , arithRules
@@ -64,7 +65,7 @@ import qualified Language.C4.Fir.Op as Op
 data Term
   = X -- ^ This term is a member of the input expression equivalence class.
   | K K.Const -- ^ This term is a constant.
-    deriving (Eq, Ord)
+    deriving (Eq, Ord, Show)
 makePrisms ''Term
 
 {- Implementing `AsConst` here gives us free access to various convenience
@@ -88,6 +89,14 @@ data BIn a =
     , rhs :: a -- ^ The right-hand side of the input specification.
     } deriving (Functor, Foldable, Traversable, Show)
 
+-- | Lifts a function on two inputs to one over an input specification.
+--
+--   This is effectively a fancy version of 'uncurry'.
+onBIn :: (a -> a -> b) -- ^ The function to receive the input specification.
+      -> BIn a         -- ^ The input specification to apply.
+      -> b             -- ^ The result of the function.
+onBIn f BIn {lhs, rhs} = f lhs rhs
+
 -- | Fills an input specification, replacing each X-term with an expression
 --   in the given list.  The i-th expression replaces, if appropriate, the
 --   i-th term, with the list being cycled infinitely if needed.
@@ -104,7 +113,7 @@ op lhs rhs = [BIn {lhs, rhs}]
 comm :: [BIn Term] -> [BIn Term]
 comm = (>>= commOne)
   where
-    commOne (BIn {lhs, rhs})
+    commOne BIn {lhs, rhs}
       | lhs == rhs = lhs `op` rhs
       | otherwise  = [ BIn {lhs, rhs}, BIn {lhs=rhs, rhs=lhs} ]
 
