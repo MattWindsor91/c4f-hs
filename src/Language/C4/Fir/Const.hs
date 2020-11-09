@@ -15,7 +15,6 @@
 -- is true; when converting integers to booleans, we further specificially map
 -- true to 1.
 --------------------------------------------------------------------------------
-
 module Language.C4.Fir.Const
   ( Const (I32, Bool)
     -- * Lenses
