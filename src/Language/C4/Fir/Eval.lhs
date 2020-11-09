@@ -5,11 +5,6 @@ The successful testing of various parts of the fuzzer system depends on the
 ability to evaluate expressions (at least, in an idealised sequential version
 of the Fir semantics).
 
-> {-# LANGUAGE
->   TypeSynonymInstances
-> , FlexibleInstances
-> #-}
-
 > {-|
 > Module      : Language.C4.Fir.Eval
 > Description : C4 Fuzzable Internal Representation: Expression evaluation
@@ -21,29 +16,16 @@ of the Fir semantics).
 > module Language.C4.Fir.Eval
 >   ( MonadEval (load, store, rmw, cmpxchg)
 >   , evalExpr
->   , seqEvalExpr
->   , seqEvalExpr'
->     -- Heaps
->   , Heap
->   , empty
->   , update
->     -- Sequential evaluation monad
->   , SeqEval
->   , seqLoad
->   , seqStore
->   , seqRmw
->   , seqCmpxchg
 >     -- Error
 >   , EvalError (VarError)
 >   )
 > where
 > import qualified Data.Functor.Foldable as F
 > import Control.Applicative (liftA2)
-> import Control.Monad.Except (throwError)
-> import Control.Monad.State (StateT, gets, modify, runStateT, evalStateT)
 > import Data.Bits (complement)
 > import Data.Int (Int32)
 > import Data.Function (on)
+
 > import Language.C4.Fir.Const (Const (..), bool, i32, coerceBool, coerceI32)
 > import Language.C4.Fir.Expr (Expr (..), ExprF (..), PrimExpr (..) )
 > import qualified Language.C4.Fir.Op as Op
@@ -69,68 +51,6 @@ The sequential evaluation monad is a state transformer over evaluation errors,
 where the state is a heap modelled as a partial function from addresses to
 constants.
 
-> -- | Model of expression evaluation with sequential semantics.
-> type SeqEval = StateT Heap (Either EvalError)
-
-> -- | A shallow heap model.
-> type Heap = NormAddress -> Maybe Const
-
-> -- | The empty heap.
-> empty :: Heap
-> empty = const Nothing
-
-We update a heap by producing a new function that checks the new mapping first,
-and then delegates to the old heap.  This is quite inefficient, but at time of
-writing we don't expect the Seq heap model to be used very extensively.
-
-> -- | Updates a heap with a new mapping.
-> update :: NormAddress -> Const -> Heap -> Heap
-> update a k h a' = if a == a' then Just k else h a'
-
-The monad implements MonadEval, but does so by ignoring memory orders and
-propagating heap changes immediately.
-
-> instance MonadEval SeqEval where
->   load _ = seqLoad
->   store _ = seqStore
->   rmw _ = seqRmw
->   cmpxchg _ _ = seqCmpxchg
-
-We now give the definitions of the various Seq heap operations.  Since we're
-just assuming that heap updates propagate immediately without any
-
-> -- | Loads an address in the Seq evaluation model.
-> seqLoad :: NormAddress -> SeqEval Const
-> seqLoad a = gets ($ a) >>= seqTag (VarError a)
-
-ScTag just 'tags' a partial evaluation with an error.
-
-> {- | Lifts a partial evaluation into the `SeqEval` monad by tagging failure to
->      evaluate with an error. -}
-> seqTag :: EvalError -> Maybe a -> SeqEval a
-> seqTag e = maybe (throwError e) return
-
-> -- | Stores a constant to an address in the Seq evaluation model.
-> seqStore :: NormAddress -> Const -> SeqEval ()
-> seqStore a = modify . update a
-
-We can define the various read-modify-write actions through loads and stores:
-
-> -- | Read-modify-writes a constant at an address in the Seq evaluation model.
-> seqRmw :: NormAddress -> (Const -> Const) -> SeqEval Const
-> seqRmw a f = seqLoad a >>= modWrite
->   where modWrite v = v <$ seqStore a (f v)
-
-> -- | Performs a C-style compare-exchange in the Seq evaluation model.
-> seqCmpxchg :: NormAddress -> NormAddress -> Const -> SeqEval Bool
-> seqCmpxchg o e d =
->   do
->     ov <- seqLoad o
->     ev <- seqLoad e
->     if ov == ev
->     then True <$ seqStore o d
->     else False <$ seqStore e ov
-
 Evaluating expressions
 ----------------------
 
@@ -154,16 +74,6 @@ Every other leg delegates to several sub-evaluators we define below.
 >     evalExpr' (PrimF p) = evalPrim p
 >     evalExpr' (BinF o l r) = evalBop o l r
 >     evalExpr' (UnF o x) = evalUop o x
-
-> -- | Evaluates an expression in a sequential heap,
-> --   returning the new heap and constant final value on success.
-> seqEvalExpr' :: Expr a -> Heap -> Either EvalError (Const, Heap)
-> seqEvalExpr' = runStateT . evalExpr
-
-> -- | Evaluates an expression in a sequential heap,
-> --   returning the constant final value on success.
-> seqEvalExpr :: Expr a -> Heap -> Either EvalError Const
-> seqEvalExpr = evalStateT . evalExpr
 
 Evaluating primitives
 ---------------------

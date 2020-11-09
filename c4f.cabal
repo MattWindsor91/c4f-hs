@@ -28,6 +28,7 @@ library
       Language.C4.Fir.Const
       Language.C4.Fir.Eval
       Language.C4.Fir.Expr
+      Language.C4.Fir.Heap
       Language.C4.Fir.Id
       Language.C4.Fir.Lvalue
       Language.C4.Fir.MemOrder

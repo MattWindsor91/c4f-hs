@@ -22,29 +22,30 @@ import qualified Hedgehog.Range as Range
 import qualified Language.C4.Fir.Const as K
 import qualified Language.C4.Fir.OpAlgebra as Src
 import qualified Language.C4.Fir.Op as Op
-import qualified Language.C4.Fir.Expr as E
-import qualified Language.C4.Fir.Eval as Eval
+import qualified Language.C4.Fir.Eval as E
+import qualified Language.C4.Fir.Expr as X
+import qualified Language.C4.Fir.Heap as H
 
 -- | Evaluates an expression under the empty heap.
-evalEmpty :: E.Expr () -> Either Eval.EvalError K.Const
-evalEmpty = (`Eval.seqEvalExpr` Eval.empty)
+evalEmpty :: X.Expr () -> Either E.EvalError K.Const
+evalEmpty = (`H.seqEvalExpr` H.empty)
 
 -- | Property checking if two expressions evaluate to the same value on the
 --   empty heap.
-evalSameAs :: MonadTest m => E.Expr () -> E.Expr () -> m ()
+evalSameAs :: MonadTest m => X.Expr () -> X.Expr () -> m ()
 evalSameAs = (===) `on` evalEmpty
 
 -- | Skeleton for properties that test rule validity.
 rulesValidProp
   :: Show o
-  => Gen (E.Expr ())                  -- ^ Generator for input constants.
+  => Gen (X.Expr ())                  -- ^ Generator for input constants.
   -> (o -> Op.Bop)                    -- ^ Lifter for operators.
   -> Src.RuleSet o (Src.BIn Src.Term) -- ^ The rule set to investigate.
   -> PropertyT IO ()                  -- ^ The test proper.
 rulesValidProp ins f rset =
   do (op, inp, outp) <- forAll rules
      i               <- forAll ins
-     (E.Bin (f op) `Src.onBIn` Src.fill (pure i) inp) `evalSameAs` Src.subst i outp
+     (X.Bin (f op) `Src.onBIn` Src.fill (pure i) inp) `evalSameAs` Src.subst i outp
   where rules  = Gen.element (Src.allRules rset)
 
 -- | Checks validity of arithmetic bop rules.
