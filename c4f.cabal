@@ -34,6 +34,7 @@ library
       Language.C4.Fir.MemOrder
       Language.C4.Fir.Op
       Language.C4.Fir.OpAlgebra
+      Language.C4.Fir.Type
       Lib
   other-modules:
       Paths_c4f
