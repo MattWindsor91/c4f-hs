@@ -29,8 +29,8 @@ import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, gets, modify, runStateT, evalStateT)
 import Data.Function ((&))
 import qualified Language.C4.Fir.Const as K
-import qualified Language.C4.Fir.Eval as E
-import qualified Language.C4.Fir.Expr as X
+import qualified Language.C4.Fir.Expr.Eval as E
+import qualified Language.C4.Fir.Expr.Expr as X
 import qualified Language.C4.Fir.Lvalue as L
 
 -- | A shallow heap model.

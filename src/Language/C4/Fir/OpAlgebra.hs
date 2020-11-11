@@ -59,7 +59,7 @@ import Control.Lens
   , toListOf
   )
 import qualified Language.C4.Fir.Const as K
-import qualified Language.C4.Fir.Op as Op
+import qualified Language.C4.Fir.Expr.Op as Op
 
 -- | Encoding of terms in rules.
 data Term

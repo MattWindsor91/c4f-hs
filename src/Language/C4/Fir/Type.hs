@@ -16,6 +16,7 @@ module Language.C4.Fir.Type
   , Signedness (Signed)
   , Indirection (Direct, PointerTo)
   , Atomicity (Atomic, NonAtomic)
+    -- * Types of types
   , SType (TBool, TInt)
   , PType (TScalar)
   , Type  (Type, _pType, _atomicity, _indirection)
@@ -48,6 +49,10 @@ data Atomicity
   = Atomic    -- ^ Atomic type.
   | NonAtomic -- ^ Non-atomic type1.
 
+{-
+ - Types of types
+ -}
+
 -- | Scalar types.
 data SType
   = TBool        -- ^ Boolean type.
@@ -64,7 +69,6 @@ data Type a i = Type
   , _atomicity   :: a     -- ^ The atomicity of the type.
   , _indirection :: i     -- ^ The indirection of the type.
   }
-
 
 -- | Type synonym for full, potentially-atomic types.
 type AType = Type Atomicity Indirection

@@ -21,9 +21,9 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 import qualified Language.C4.Fir.Const as K
 import qualified Language.C4.Fir.OpAlgebra as Src
-import qualified Language.C4.Fir.Op as Op
-import qualified Language.C4.Fir.Eval as E
-import qualified Language.C4.Fir.Expr as X
+import qualified Language.C4.Fir.Expr.Op as Op
+import qualified Language.C4.Fir.Expr.Eval as E
+import qualified Language.C4.Fir.Expr.Expr as X
 import qualified Language.C4.Fir.Heap as H
 
 -- | Evaluates an expression under the empty heap.
