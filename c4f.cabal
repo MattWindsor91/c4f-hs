@@ -25,7 +25,9 @@ source-repository head
 
 library
   exposed-modules:
+      Language.C4.Fir.Atomic.Load
       Language.C4.Fir.Atomic.MemOrder
+      Language.C4.Fir.Atomic.MemScope
       Language.C4.Fir.Const
       Language.C4.Fir.Expr.Eval
       Language.C4.Fir.Expr.Expr
