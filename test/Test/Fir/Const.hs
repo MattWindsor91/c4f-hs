@@ -23,7 +23,9 @@ prop_coerceBoolIntTrip = property $
   forAll Gen.bool >>= \x -> tripping x boolI32 i32Bool
   where
     boolI32 = Src.coerceI32 . L.review Src._Bool
-    i32Bool = L.Identity . Src.coerceBool . L.review Src._I32
+    i32Bool = (Src.coerceBool . L.review Src._I32 =<<)
+
+
 
 tests :: IO Bool
 tests =

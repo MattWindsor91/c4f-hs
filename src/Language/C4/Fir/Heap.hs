@@ -63,10 +63,11 @@ type SeqEval = StateT Heap (Either E.EvalError)
 {- The monad implements MonadEval, but does so by ignoring memory orders and
    propagating heap changes immediately. -}
 instance E.MonadEval SeqEval where
-  load _ = seqLoad
-  store _ = seqStore
-  rmw _ = seqRmw
+  load    _   = seqLoad
+  store   _   = seqStore
+  rmw     _   = seqRmw
   cmpxchg _ _ = seqCmpxchg
+  err         = throwError
 
 -- | Loads an address in the Seq evaluation model.
 seqLoad :: L.NormAddress -> SeqEval K.Const

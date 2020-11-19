@@ -16,12 +16,13 @@
 -- true to 1.
 --------------------------------------------------------------------------------
 module Language.C4.Fir.Const
-  ( Const (I32, Bool)
-    -- * Lenses
+  ( Const (I32, Bool, Mo)
+    -- * Optics
   , AsConst
   , _Const
   , _I32
   , _Bool
+  , _Mo
     -- * Convenience constructors
   , i32
   , bool
@@ -35,6 +36,8 @@ module Language.C4.Fir.Const
   , gen
   ) where
 
+import Language.C4.Fir.Atomic.MemOrder (MemOrder, _MemOrder, AsMemOrder)
+
 import Data.Int (Int32)
 import Control.Lens (makeClassyPrisms, review)
 import Hedgehog (MonadGen)
@@ -44,17 +47,24 @@ import qualified Hedgehog.Range as Range
 -- | Fir constants.
 --
 -- Fir supports (signed) integer and Boolean ("true", "false") constants.
--- These are ordered, though the order only makes intuitive sense in terms of
--- comparing constants of the same type; it mainly exists to let us use
+-- It also encodes memory orders as constants; this lets us write arbitrary
+-- memory order expressions as arguments to atomics.
+--
+-- Constants are ordered, though the order only makes intuitive sense in terms
+-- of comparing constants of the same type; it mainly exists to let us use
 -- constants as keys.
 data Const
-  = Bool Bool -- ^ Booleans.
-  | I32 Int32 -- ^ 32-bit integers.
+  = Bool Bool     -- ^ Booleans.
+  | I32  Int32    -- ^ 32-bit integers.
+  | Mo   MemOrder -- ^ Memory orders.
     deriving (Eq, Ord, Show)
 
 -- This TemplateHaskell incantation gives us an `AsConst` type class which we
 -- can use to manipulate larger expression types as if they are `Const`.
 makeClassyPrisms ''Const
+
+-- | Constants of type 'Mo' can be seen as memory orders.
+instance AsMemOrder Const where _MemOrder = _Mo
 
 {-
  - Convenience constructors
@@ -85,14 +95,16 @@ false = bool False
  -}
 
 -- | Coerces a constant to a Boolean value, using C11-style semantics.
-coerceBool :: Const -> Bool
-coerceBool (Bool x) = x
-coerceBool (I32  x) = intToBool x
+coerceBool :: Const -> Maybe Bool
+coerceBool (Bool x) = Just x
+coerceBool (I32  x) = Just (intToBool x)
+coerceBool (Mo   _) = Nothing
 
 -- | Coerces a constant to an integer value, using C11-style semantics.
-coerceI32 :: Const -> Int32
-coerceI32 (I32  x) = x
-coerceI32 (Bool x) = boolToInt x
+coerceI32 :: Const -> Maybe Int32
+coerceI32 (I32  x) = Just x
+coerceI32 (Bool x) = Just (boolToInt x)
+coerceI32 (Mo   _) = Nothing
 
 -- | Interpret integers of any width as Booleans using C11-style semantics.
 intToBool :: (Num a, Eq a) => a -> Bool

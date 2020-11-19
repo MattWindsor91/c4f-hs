@@ -20,12 +20,25 @@ module Language.C4.Fir.Atomic.MemOrder
       , Release
       , AcqRel
       , SeqCst
-      )
+      )  
+    -- * 'MemOrder' optics
+  , AsMemOrder
+  , _MemOrder
+  , _Relaxed
+  , _Consume
+  , _Acquire
+  , _Release
+  , _AcqRel
+  , _SeqCst
     -- * Memory order arguments
   , MemOrderArg (Implicit, Explicit)
+    -- * 'MemOrderArg' optics
+  , _Implicit
+  , _Explicit
   , _moMaybe
     -- * Compound memory orders
   , CmpxchgMemOrder (CmpxchgMemOrder, _success, _failure)
+    -- * 'CmpxchgMemOrder' optics
   , success
   , failure
   ) where
