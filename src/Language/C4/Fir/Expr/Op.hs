@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Expr.Op
--- Description : C4 Fuzzable Internal Representation: Operators
+-- Description : Operator definitions for FIR
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com

@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Heap
--- Description : Basic sequential heap model
+-- Description : Basic sequential heap model for FIR evaluation
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com

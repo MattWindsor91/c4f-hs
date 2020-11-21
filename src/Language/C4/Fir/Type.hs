@@ -1,13 +1,13 @@
 --------------------------------------------------------------------------------
 -- |
--- Module      : Language.C4.Fir.Heap
+-- Module      : Language.C4.Fir.Type
 -- Description : FIR type system
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com
 -- Stability   : experimental
 --
--- The FIR type system is basically that of C, but with more emphasis on
+-- The FIR type system is basically that of C11, but with more emphasis on
 -- sized integers.
 --------------------------------------------------------------------------------
 module Language.C4.Fir.Type

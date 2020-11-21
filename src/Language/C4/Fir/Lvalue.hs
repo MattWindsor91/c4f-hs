@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Lvalue
--- Description : C4 Fuzzable Internal Representation: lvalues and addresses
+-- Description : Lvalues and addresses in FIR
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com
@@ -11,20 +11,21 @@
 --------------------------------------------------------------------------------
 
 module Language.C4.Fir.Lvalue
-  ( Address (Lv, Ref)
+  ( -- * Key definitions
+    Address (Lv, Ref)
   , Lvalue  (Var, Deref)
-    -- * Normalised addresses
-  , NormAddress
-  , normalise
-  , denormalise
-    -- * Recursion schemes
+    -- ** Recursion schemes
   , AddressF (LvF, RefF)
   , LvalueF  (VarF, DerefF)
-    -- * Optics
+    -- ** Optics
   , _Lv
   , _Ref
   , _Var
   , _Deref
+    -- * Normalised addresses
+  , NormAddress
+  , normalise
+  , denormalise
     -- * Non-typesafe generators
   , genLvalue'
   , genLvalue
@@ -81,7 +82,7 @@ data Address
     deriving (Eq, Show)
 LL.makePrisms ''Address
 
--- An address is an identifier if it is `Lv (Var x)` for some `x`.
+-- An address is an identifier if it is `Lv (Var x)` for some @x@.
 instance AsId Address where _Id = _Lv . _Var
 
 -- | Base functor for recursion on 'Address'.
@@ -110,8 +111,8 @@ instance HasId Address where underlyingId = addressId
 
 -- | Normalised addresses.
 --
--- Addresses are not normalised by default: for instance, if `a` is a pointer,
--- `a`, `&*a`, and `&&**a` all point to the same bit of memory.  This is an
+-- Addresses are not normalised by default: for instance, if @a@ is a pointer,
+-- @a@, @&*a@, and @&&**a@ all point to the same bit of memory.  This is an
 -- issue for things like modelling heaps as address maps.
 --
 -- Create normalised addresses using 'normalise', and lower them back to
@@ -123,7 +124,7 @@ newtype NormAddress = Norm Address deriving (Eq, Show)
 -- Addresses normalise recursively using the following rules:
 --
 -- - A raw lvalue is already normalised.
--- - A reference of a normalised dereference, ie `&*x`, becomes `x`.
+-- - A reference of a normalised dereference, ie @&*x@, becomes @x@.
 -- - Any other reference of a normalised value is normalised.
 normalise :: Address -> NormAddress
 normalise = F.fold normalise'

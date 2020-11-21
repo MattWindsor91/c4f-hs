@@ -6,7 +6,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.OpAlgebra
--- Description : C4 Fuzzable Internal Representation: Operator algebraic rules
+-- Description : Operator algebraic rules for FIR
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com
@@ -16,11 +16,11 @@
 -- particular algebraic rules over operators.  We encode these rules
 -- programmatically in this module.
 -- 
--- Each rule is of the form `forall x. in(x) -> out(x)`, where `x` is some
--- equivalence class on expressions.  For binary operators, `in(x)` will
--- usually be of the form `x OP x` (two equivalent expressions), `k OP x` (left
--- is a constant), or `x OP k` (right is a constant).  The output `out(x)` is
--- either `x` or `k`.
+-- Each rule is of the form @forall x. in(x) -> out(x)@, where @x@ is some
+-- equivalence class on expressions.  For binary operators, @in(x)@ will
+-- usually be of the form @x OP x@ (two equivalent expressions), @k OP x@ (left
+-- is a constant), or @x OP k@ (right is a constant).  The output @out(x)@ is
+-- either @x@ or @k@.
 --------------------------------------------------------------------------------
 module Language.C4.Fir.OpAlgebra
   ( -- Terms
@@ -63,13 +63,13 @@ import qualified Language.C4.Fir.Expr.Op as Op
 
 -- | Encoding of terms in rules.
 data Term
-  = X -- ^ This term is a member of the input expression equivalence class.
-  | K K.Const -- ^ This term is a constant.
+  = X         -- ^ A member of the input expression equivalence class.
+  | K K.Const -- ^ A constant.
     deriving (Eq, Ord, Show)
 makePrisms ''Term
 
-{- Implementing `AsConst` here gives us free access to various convenience
-   constructors. -}
+-- | We can view 'K' as a constant; turning this around, we get free access to
+--   various convenience constructors.
 instance K.AsConst Term where _Const = _K
 
 -- | Substitutes an expression into a term if it is X;
@@ -84,10 +84,9 @@ subst _ (K k) = K._Const#k
 -- operators, binary operators take pairs of inputs, and we need to be able to
 -- substitute across both simultaneously (with one or more input expressions).
 data BIn a =
-  BIn
-    { lhs :: a -- ^ The left-hand side of the input specification.
-    , rhs :: a -- ^ The right-hand side of the input specification.
-    } deriving (Functor, Foldable, Traversable, Show)
+  BIn { lhs :: a -- ^ The left-hand side of the input specification.
+      , rhs :: a -- ^ The right-hand side of the input specification.
+      } deriving (Functor, Foldable, Traversable, Show)
 
 -- | Lifts a function on two inputs to one over an input specification.
 --
@@ -105,7 +104,7 @@ fill inputs = snd . mapAccumL fillStep (NE.cycle inputs)
   -- Since the input list is cycled infinitely, `fromList` should be safe here
   where fillStep (x NE.:| xs) = (NE.fromList xs ,) . subst x
 
--- | l `op` r is convenient shorthand for a position-dependent input spec.
+-- | Convenient shorthand for a position-dependent input spec.
 op :: Term -> Term -> [BIn Term]
 op lhs rhs = [BIn {lhs, rhs}]
 
@@ -155,8 +154,10 @@ ruleAssoc = toListOf (each . _rule)
 
 -- | Takes an input list and output term, and produces a rule stub.
 --
--- The weird shape of the '@->' operator exists to set up the DSL later on:
--- it lets us write `[ operators ] & input @-> output`.
+-- The weird shape of this operator exists to set up the DSL later on:
+-- it lets us write things like:
+--
+-- > [ operators ] & input @-> output
 (@->) :: Ord o => [i] -> Term -> [o] -> Rule o i
 (@->) ins out ops = singleHead ops ins :-> out
 
@@ -235,11 +236,9 @@ logicalRules = rules
 -- | relRules is the rule table for relational operators.
 --
 -- Relational rules boil down, for now, to reflexivity: any relation that
--- implies `==` has the rule `x OP x == true`; the others, `x OP x == false`.
+-- implies @==@ has the rule @x OP x == true@; the others, @x OP x == false@.
 relRules :: RuleSet Op.RBop (BIn Term)
 relRules = rules (map ruleFor (enumFrom minBound))
   where
     ruleFor :: Op.RBop -> Rule Op.RBop (BIn Term)
     ruleFor o = [o] & X `op` X @-> K.bool (Op.relIncl o (Op.:==))
-
-

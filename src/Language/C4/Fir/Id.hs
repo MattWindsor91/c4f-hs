@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Id
--- Description : C4 Fuzzable Internal Representation: identifiers
+-- Description : C-style identifier definitions for FIR
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com
@@ -72,8 +72,8 @@ toBytes (Id x) = x
 -- | Tries to lift a bytestring to an identifier.
 --
 -- Returns 'Nothing' if the bytestring does not obey the invariant on
--- identifiers (first character is ASCII alphabetical or '_'; second character
--- is ASCII alphanumeric or '_').
+-- identifiers (first character is ASCII alphabetical or @_@; second character
+-- is ASCII alphanumeric or @_@).
 fromBytes :: C.ByteString -> Maybe Id
 fromBytes x = if isValid x then Just (Id x) else Nothing
 
