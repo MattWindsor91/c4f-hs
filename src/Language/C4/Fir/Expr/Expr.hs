@@ -15,14 +15,30 @@ module Language.C4.Fir.Expr.Expr
       ( Meta
       , ALoad
       , Prim
+      , Cond
       , Bin
       , Un
       )
+  , _Meta
+  , _ALoad
+  , _Prim
+  , _Cond
+  , _Bin
+  , _Un
+    -- * Primitive expressions
   , PExpr (Con, Addr)
+  , _Con
+  , _Addr
+    -- * Conditional expressions
+  , CExpr (CExpr, _cond, _tBranch, _fBranch)
+  , cond
+  , tBranch
+  , fBranch
     -- * Recursion schemes
   , ExprF
       ( MetaF
       , ALoadF
+      , CondF
       , PrimF
       , BinF
       , UnF
@@ -47,7 +63,7 @@ module Language.C4.Fir.Expr.Expr
   , (@||) -- :: Expr m -> Expr m -> Expr m
   ) where
 
-import Control.Lens (makePrisms)
+import Control.Lens (makeLenses, makePrisms)
 import qualified Data.Functor.Foldable as F
 import Language.C4.Fir.Atomic.Action (Load)
 import Language.C4.Fir.Const (AsConst, Const, _Const)
@@ -64,17 +80,24 @@ data PExpr
   = Con  Const     -- ^ Constant expression.
   | Addr Address   -- ^ Address expression.
     deriving (Eq, Show)
-
 -- There doesn't seem to be a good reason for PExprs to be classy.
 makePrisms ''PExpr
-
 instance AsConst PExpr where _Const = _Con
+
+-- | Conditional ('ternary') expressions.
+data CExpr e
+  = CExpr { _cond    :: e -- ^ The condition of the conditional expression.
+          , _tBranch :: e -- ^ The true branch of the conditional expression.
+          , _fBranch :: e -- ^ The false branch of the conditional expression.
+          } deriving (Eq, Show, Functor)
+makeLenses ''CExpr
 
 -- | Top-level expressions.
 data Expr m
   = Meta  m (Expr m)            -- ^ Wraps an expression in metadata.
   | Prim  PExpr                 -- ^ Primitive expression.
   | ALoad (Load (Expr m))       -- ^ Atomic load.
+  | Cond  (CExpr (Expr m))      -- ^ Conditional expression.
   | Bin   Bop (Expr m) (Expr m) -- ^ Binary operation.
   | Un    Uop (Expr m)          -- ^ Unary operation.
     deriving (Eq, Show)
@@ -83,8 +106,41 @@ data Expr m
    metadata parameter causes the resulting class to be very unwieldy.  This may
    change in future if we really need it.  -}
 makePrisms ''Expr
-
 instance AsConst (Expr m) where _Const = _Prim . _Con
+
+{-
+ - Recursion schemes
+ -}
+
+-- Base functor for 'Expr'.
+--
+-- The 'Expr' type with all instances of recursion into 'Expr' replaced
+-- with a free type parameter.
+data ExprF m b
+  = MetaF  m b       -- ^ Non-recursive form of 'Meta'.
+  | PrimF  PExpr     -- ^ Non-recursive form of 'Prim'.
+  | ALoadF (Load b)  -- ^ Non-recursive form of 'ALoad'.
+  | CondF  (CExpr b) -- ^ Non-recursive form of 'Cond'.
+  | BinF   Bop b b   -- ^ Non-recursive form of 'Bin'.
+  | UnF    Uop b     -- ^ Non-recursive form of 'Un'.
+    deriving Functor
+
+-- The usual `recursion-schemes` boilerplate follows:
+type instance F.Base (Expr m) = ExprF m
+instance F.Recursive (Expr m) where
+  project (Meta  m x  ) = MetaF  m x
+  project (Prim  x    ) = PrimF  x
+  project (ALoad x    ) = ALoadF x
+  project (Cond  x    ) = CondF  x
+  project (Bin   o l r) = BinF   o l r
+  project (Un    o x  ) = UnF    o x
+instance F.Corecursive (Expr m) where
+  embed (MetaF  m x  ) = Meta  m x
+  embed (PrimF  x    ) = Prim  x
+  embed (ALoadF x    ) = ALoad x
+  embed (CondF  x    ) = Cond  x
+  embed (BinF   o l r) = Bin   o l r
+  embed (UnF    o x  ) = Un    o x
 
 {-
  - Binary operator shorthand
@@ -173,33 +229,3 @@ infixl 1 @&&
 (@||) = Bin (Logical (:||))
 infixl 0 @||
 
-{-
- - Recursion schemes
- -}
-
--- Base functor for 'Expr'.
---
--- The 'Expr' type with all instances of recursion into 'Expr' replaced
--- with a free type parameter.
-data ExprF m b
-  = MetaF  m b      -- ^ Non-recursive form of 'Meta'.
-  | PrimF  PExpr    -- ^ Non-recursive form of 'Prim'.
-  | ALoadF (Load b) -- ^ Non-recursive form of 'ALoad'.
-  | BinF   Bop b b  -- ^ Non-recursive form of 'Bin'.
-  | UnF    Uop b    -- ^ Non-recursive form of 'Un'.
-    deriving Functor
-
--- The usual `recursion-schemes` boilerplate follows:
-type instance F.Base (Expr m) = ExprF m
-instance F.Recursive (Expr m) where
-  project (Meta  m x  ) = MetaF m x
-  project (Prim  x    ) = PrimF x
-  project (ALoad x    ) = ALoadF x
-  project (Bin   o l r) = BinF  o l r
-  project (Un    o x  ) = UnF   o x
-instance F.Corecursive (Expr m) where
-  embed (MetaF  m x  ) = Meta  m x
-  embed (PrimF  x    ) = Prim  x
-  embed (ALoadF x    ) = ALoad x
-  embed (BinF   o l r) = Bin   o l r
-  embed (UnF    o x  ) = Un    o x

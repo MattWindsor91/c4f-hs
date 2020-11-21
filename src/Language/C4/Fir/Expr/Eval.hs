@@ -25,7 +25,6 @@ module Language.C4.Fir.Expr.Eval
 
 import qualified Data.Functor.Foldable as F
 import Control.Applicative (liftA2)
-import Control.Monad ((<=<))
 import qualified Control.Lens as L
 import Data.Bits (complement)
 import Data.Function (on)
@@ -33,7 +32,12 @@ import Data.Maybe (fromJust)
 import qualified Type.Reflection as TR
 import qualified Language.C4.Fir.Atomic.Action as A
 import qualified Language.C4.Fir.Const as K
-import Language.C4.Fir.Expr.Expr (Expr (..), ExprF (..), PExpr (..) )
+import Language.C4.Fir.Expr.Expr
+  ( Expr (..) 
+  , ExprF (..)
+  , CExpr (..)
+  , PExpr (..)
+  )
 import qualified Language.C4.Fir.Expr.Op as Op
 import qualified Language.C4.Fir.Type as T
 import Language.C4.Fir.Lvalue (NormAddress, normalise)
@@ -68,29 +72,47 @@ evalExpr = F.fold evalExpr'
   -- Evaluation ignores metadata.
   -- Every other leg delegates to several sub-evaluators we define below.
   where evalExpr' (MetaF  _ k  ) = k
-        evalExpr' (PrimF  p    ) = evalPrim p
+        evalExpr' (PrimF  p    ) = evalPExpr p
         evalExpr' (ALoadF l    ) = evalALoad l
+        evalExpr' (CondF  c    ) = evalCExpr c
         evalExpr' (BinF   o l r) = evalBop o l r
         evalExpr' (UnF    o x  ) = evalUop o x
 
 -- | Evaluates a primitive expression.
-evalPrim
+evalPExpr
   :: MonadEval m
   => PExpr       -- ^ The primitive expression.
   -> m K.Const   -- ^ The computation for the result.
 -- Evaluating constants is trivial: we just return them.
-evalPrim (Con x) = pure x
+evalPExpr (Con x) = pure x
 -- To evaluate addresses, we normalise them, then look them up in the current
 -- heap with non-atomic semantics.
-evalPrim (Addr a) = load Nothing (normalise a)
+evalPExpr (Addr a) = load Nothing (normalise a)
 
--- | Evaluates an atomic load.
+-- | Evaluates an atomic load whose memory order has been part-evaluated.
 evalALoad
   :: MonadEval m
   => A.Load (m K.Const) -- ^ The atomic load.
   -> m K.Const          -- ^ The computation for the result.
 evalALoad A.Load { A._src, A._mo } =
   moArg _mo >>= \mo -> load (Just mo) (normalise _src)
+
+{-
+ - Conditional expressions
+ -}
+
+-- | Evaluates a conditional expression whose legs have been part-evaluated.
+evalCExpr
+  :: MonadEval m
+  => CExpr (m K.Const) -- ^ The conditional expression.
+  -> m K.Const         -- ^ The computation for the result.
+evalCExpr CExpr { _cond, _tBranch, _fBranch } =
+  _cond >>= liftCoerce K.coerceBool >>= doCond
+  where doCond c = if c then _tBranch else _fBranch
+
+{-
+ - Binary operators
+ -}
 
 -- | Provides the main shape of a binary operator evaluator.
 evalBopGen
@@ -118,7 +140,6 @@ evalABop = evalBopGen K.coerceI32 K.i32 . liftA2 . Op.semABop
 -- | Evaluates a bitwise binary operation.
 evalBBop :: MonadEval m => BopEval Op.BBop m
 evalBBop = evalBopGen K.coerceI32 K.i32 . liftA2 . Op.semBBop
-
 
 -- | Evaluates a logical binary operation.
 --

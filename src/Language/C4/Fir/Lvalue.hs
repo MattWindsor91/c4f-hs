@@ -16,6 +16,7 @@ module Language.C4.Fir.Lvalue
     -- * Normalised addresses
   , NormAddress
   , normalise
+  , denormalise
     -- * Recursion schemes
   , AddressF (LvF, RefF)
   , LvalueF  (VarF, DerefF)
