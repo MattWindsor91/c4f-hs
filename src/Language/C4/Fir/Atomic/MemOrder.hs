@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, KindSignatures #-}
+{-# LANGUAGE DeriveFunctor, TemplateHaskell, KindSignatures #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -66,7 +66,7 @@ makeClassyPrisms ''MemOrder
 data MemOrderArg e
   = Implicit   -- ^ An implicit memory order (ie, sequential consistency).
   | Explicit e -- ^ An explicit memory order.
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Functor, Show)
 makePrisms ''MemOrderArg
 
 -- | 'MemOrderArg' is isomorphic to 'Maybe e', where 'e' is the memory order
@@ -81,5 +81,5 @@ data CmpxchgMemOrder e
   = CmpxchgMemOrder
       { _success :: e -- ^ Memory order on success.
       , _failure :: e -- ^ Memory order on failure.
-      }
+      } deriving (Eq, Ord, Functor, Show)
 makeLenses ''CmpxchgMemOrder

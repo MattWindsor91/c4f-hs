@@ -11,10 +11,22 @@
 --------------------------------------------------------------------------------
 
 module Language.C4.Fir.Expr.Expr
-  ( Expr (Meta, Prim, Bin, Un)
-  , PrimExpr (Con, Addr)
+  ( Expr
+      ( Meta
+      , ALoad
+      , Prim
+      , Bin
+      , Un
+      )
+  , PExpr (Con, Addr)
     -- * Recursion schemes
-  , ExprF (MetaF, PrimF, BinF, UnF)
+  , ExprF
+      ( MetaF
+      , ALoadF
+      , PrimF
+      , BinF
+      , UnF
+      )
     -- * Binary operator shorthand
   , arith
   , (@+) -- :: Expr m -> Expr m -> Expr m
@@ -37,29 +49,34 @@ module Language.C4.Fir.Expr.Expr
 
 import Control.Lens (makePrisms)
 import qualified Data.Functor.Foldable as F
+import Language.C4.Fir.Atomic.Action (Load)
 import Language.C4.Fir.Const (AsConst, Const, _Const)
-import Language.C4.Fir.Id (Id)
 import Language.C4.Fir.Lvalue (Address)
 import Language.C4.Fir.Expr.Op
   (ABop (..), BBop (..), LBop (..), RBop (..), Bop (..), Uop (..) )
 
 -- | Primitive expressions.
-data PrimExpr
-  = Con  Const   -- ^ A constant expression.
-  | Addr Address -- ^ An address expression.
+--
+--   These are expressions that depend neither on recursive expressions nor
+--   on metadata; we factor them out mainly to simplify things like recursion
+--   schemes.
+data PExpr
+  = Con  Const     -- ^ Constant expression.
+  | Addr Address   -- ^ Address expression.
     deriving (Eq, Show)
 
--- There doesn't seem to be a good reason for PrimExprs to be classy.
-makePrisms ''PrimExpr
+-- There doesn't seem to be a good reason for PExprs to be classy.
+makePrisms ''PExpr
 
-instance AsConst PrimExpr where _Const = _Con
+instance AsConst PExpr where _Const = _Con
 
 -- | Top-level expressions.
 data Expr m
-  = Meta m (Expr m)            -- ^ Wraps an expression in metadata.
-  | Prim PrimExpr              -- ^ Primitive expression.
-  | Bin  Bop (Expr m) (Expr m) -- ^ Binary operation.
-  | Un   Uop (Expr m)          -- ^ Unary operation.
+  = Meta  m (Expr m)            -- ^ Wraps an expression in metadata.
+  | Prim  PExpr                 -- ^ Primitive expression.
+  | ALoad (Load (Expr m))       -- ^ Atomic load.
+  | Bin   Bop (Expr m) (Expr m) -- ^ Binary operation.
+  | Un    Uop (Expr m)          -- ^ Unary operation.
     deriving (Eq, Show)
 
 {- We don't make classy prisms for Exprs, because the introduction of the
@@ -165,21 +182,24 @@ infixl 0 @||
 -- The 'Expr' type with all instances of recursion into 'Expr' replaced
 -- with a free type parameter.
 data ExprF m b
-  = MetaF m b      -- ^ Non-recursive form of 'Meta'.
-  | PrimF PrimExpr -- ^ Non-recursive form of 'Prim'.
-  | BinF  Bop b b  -- ^ Non-recursive form of 'Bin'.
-  | UnF   Uop b    -- ^ Non-recursive form of 'Un'.
+  = MetaF  m b      -- ^ Non-recursive form of 'Meta'.
+  | PrimF  PExpr    -- ^ Non-recursive form of 'Prim'.
+  | ALoadF (Load b) -- ^ Non-recursive form of 'ALoad'.
+  | BinF   Bop b b  -- ^ Non-recursive form of 'Bin'.
+  | UnF    Uop b    -- ^ Non-recursive form of 'Un'.
     deriving Functor
 
 -- The usual `recursion-schemes` boilerplate follows:
 type instance F.Base (Expr m) = ExprF m
 instance F.Recursive (Expr m) where
-  project (Meta m x  ) = MetaF m x
-  project (Prim x    ) = PrimF x
-  project (Bin  o l r) = BinF  o l r
-  project (Un   o x  ) = UnF   o x
+  project (Meta  m x  ) = MetaF m x
+  project (Prim  x    ) = PrimF x
+  project (ALoad x    ) = ALoadF x
+  project (Bin   o l r) = BinF  o l r
+  project (Un    o x  ) = UnF   o x
 instance F.Corecursive (Expr m) where
-  embed (MetaF m x  ) = Meta m x
-  embed (PrimF x    ) = Prim x
-  embed (BinF  o l r) = Bin  o l r
-  embed (UnF   o x  ) = Un   o x
+  embed (MetaF  m x  ) = Meta  m x
+  embed (PrimF  x    ) = Prim  x
+  embed (ALoadF x    ) = ALoad x
+  embed (BinF   o l r) = Bin   o l r
+  embed (UnF    o x  ) = Un    o x

@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Expr.Op
@@ -18,22 +19,25 @@
 module Language.C4.Fir.Expr.Eval
   ( MonadEval (load, store, rmw, cmpxchg, err)
   , evalExpr
-    -- Error
-  , EvalError (VarError)
+    -- * Error
+  , EvalError (CoerceError, NotMoError, VarError)
   ) where
 
 import qualified Data.Functor.Foldable as F
 import Control.Applicative (liftA2)
+import Control.Monad ((<=<))
+import qualified Control.Lens as L
 import Data.Bits (complement)
 import Data.Function (on)
 import Data.Maybe (fromJust)
 import qualified Type.Reflection as TR
+import qualified Language.C4.Fir.Atomic.Action as A
 import qualified Language.C4.Fir.Const as K
-import Language.C4.Fir.Expr.Expr (Expr (..), ExprF (..), PrimExpr (..) )
+import Language.C4.Fir.Expr.Expr (Expr (..), ExprF (..), PExpr (..) )
 import qualified Language.C4.Fir.Expr.Op as Op
 import qualified Language.C4.Fir.Type as T
 import Language.C4.Fir.Lvalue (NormAddress, normalise)
-import Language.C4.Fir.Atomic.MemOrder (MemOrder (..))
+import Language.C4.Fir.Atomic.MemOrder (MemOrder (..), MemOrderArg (..))
 
 -- | Monad capturing enough of the memory model to evaluate expressions.
 class Monad m => MonadEval m where
@@ -51,7 +55,10 @@ class Monad m => MonadEval m where
 
 
 -- | Evaluates an expression in an evaluation monad.
-evalExpr :: MonadEval m => Expr a -> m K.Const
+evalExpr
+  :: MonadEval m
+  => Expr a    -- ^ The expression to evaluate.
+  -> m K.Const -- ^ The computation for the result.
 {- We use a recursion-schemes fold, whereby at each step of evaluation we have
    reduced any sub-term into `m Const`: in other words, the raw computation
    that will result in a constant value if we evaluate it.  (We can't evaluate
@@ -60,35 +67,49 @@ evalExpr :: MonadEval m => Expr a -> m K.Const
 evalExpr = F.fold evalExpr'
   -- Evaluation ignores metadata.
   -- Every other leg delegates to several sub-evaluators we define below.
-  where evalExpr' (MetaF _ k  ) = k
-        evalExpr' (PrimF p    ) = evalPrim p
-        evalExpr' (BinF  o l r) = evalBop o l r
-        evalExpr' (UnF   o x  ) = evalUop o x
+  where evalExpr' (MetaF  _ k  ) = k
+        evalExpr' (PrimF  p    ) = evalPrim p
+        evalExpr' (ALoadF l    ) = evalALoad l
+        evalExpr' (BinF   o l r) = evalBop o l r
+        evalExpr' (UnF    o x  ) = evalUop o x
 
 -- | Evaluates a primitive expression.
-evalPrim :: MonadEval m => PrimExpr -> m K.Const
+evalPrim
+  :: MonadEval m
+  => PExpr       -- ^ The primitive expression.
+  -> m K.Const   -- ^ The computation for the result.
 -- Evaluating constants is trivial: we just return them.
 evalPrim (Con x) = pure x
 -- To evaluate addresses, we normalise them, then look them up in the current
 -- heap with non-atomic semantics.
 evalPrim (Addr a) = load Nothing (normalise a)
 
+-- | Evaluates an atomic load.
+evalALoad
+  :: MonadEval m
+  => A.Load (m K.Const) -- ^ The atomic load.
+  -> m K.Const          -- ^ The computation for the result.
+evalALoad A.Load { A._src, A._mo } =
+  moArg _mo >>= \mo -> load (Just mo) (normalise _src)
+
 -- | Provides the main shape of a binary operator evaluator.
-evalBopGen :: (MonadEval m, TR.Typeable a)
-           => (K.Const -> Maybe a)  -- ^ A lifter for argument constants.
-           -> (b -> K.Const)        -- ^ An unlifter for the final value.
-           -> (m a -> m a -> m b)   -- ^ The semantics of the operator.
-           -> m K.Const             -- ^ The computation for the LHS operand.
-           -> m K.Const             -- ^ The computation for the RHS operand.
-           -> m K.Const             -- ^ The computation for the result.
+evalBopGen
+  :: (MonadEval m, TR.Typeable a)
+  => (K.Const -> Maybe a)  -- ^ A lifter for argument constants.
+  -> (b -> K.Const)        -- ^ An unlifter for the final value.
+  -> (m a -> m a -> m b)   -- ^ The semantics of the operator.
+  -> m K.Const             -- ^ The computation for the LHS operand.
+  -> m K.Const             -- ^ The computation for the RHS operand.
+  -> m K.Const             -- ^ The computation for the result.
 evalBopGen arg res f = evalBopGen' `on` (>>= liftCoerce arg)
   where evalBopGen' l r = res <$> f l r
 
 -- | Type signature of binary operation evaluators.
-type BopEval o m =  o         -- ^ The arithmetic operator.
-                 -> m K.Const -- ^ The computation for the LHS operand.
-                 -> m K.Const -- ^ The computation for the RHS operand.
-                 -> m K.Const -- ^ The computation for the binary operation.
+type BopEval o m
+  =  o         -- ^ The arithmetic operator.
+  -> m K.Const -- ^ The computation for the LHS operand.
+  -> m K.Const -- ^ The computation for the RHS operand.
+  -> m K.Const -- ^ The computation for the binary operation.
 
 -- | Evaluates an arithmetic binary operation.
 evalABop :: MonadEval m => BopEval Op.ABop m
@@ -126,12 +147,13 @@ evalBop (Op.Rel     o) = evalRBop o
  -}
 
 -- | Provides the main shape of a unary operator evaluator.
-evalUopGen :: (MonadEval m, TR.Typeable a)
-           => (K.Const -> Maybe a)  -- ^ A lifter for argument constants.
-           -> (b -> K.Const)        -- ^ An unlifter for the final value.
-           -> (m a -> m b)          -- ^ The semantics of the operator.
-           -> m K.Const             -- ^ The computation for the operand.
-           -> m K.Const             -- ^ The computation for the result.
+evalUopGen
+  :: (MonadEval m, TR.Typeable a)
+  => (K.Const -> Maybe a)  -- ^ A lifter for argument constants.
+  -> (b -> K.Const)        -- ^ An unlifter for the final value.
+  -> (m a -> m b)          -- ^ The semantics of the operator.
+  -> m K.Const             -- ^ The computation for the operand.
+  -> m K.Const             -- ^ The computation for the result.
 evalUopGen arg res f = fmap res . f . (>>= liftCoerce arg)
 
 -- | Evaluates a unary operator.
@@ -140,24 +162,52 @@ evalUop Op.Comp = evalUopGen K.coerceI32  K.i32  (fmap complement)
 evalUop Op.Not  = evalUopGen K.coerceBool K.bool (fmap not)
 
 {-
+ - Memory orders
+ -}
+
+-- | Evaluates a (partially evaluated) memory order argument to a memory order.
+--
+-- Per usual C11 semantics, implicit memory orders expand to SC.
+moArg
+  :: MonadEval m
+  => MemOrderArg (m K.Const) -- ^ The partially-evaluated memory order argument.
+  -> m MemOrder              -- ^ The final memory order.
+moArg Implicit     = return SeqCst
+moArg (Explicit e) = asMo =<< e
+
+-- | Interprets a constant as a memory order.
+asMo
+  :: MonadEval m
+  => K.Const     -- ^ The constant to interpret.
+  -> m MemOrder  -- ^ The final memory order.
+-- This could be a variant of liftCoerce/coerceXYZ, but we'd need to deal with
+-- the reflection back into types; MemOrder doesn't have one yet.
+asMo = either moErr return . L.matching K._Mo
+  where moErr k = err (NotMoError k)
+
+{-
  - Errors and miscellanea
  -}
 
 -- | Lifts a coersion into the evaluation monad.
-liftCoerce :: (MonadEval m, TR.Typeable a)
-           => (K.Const -> Maybe a) -- ^ The coersion.
-           -> K.Const              -- ^ The constant to coerce.
-           -> m a                  -- ^ The final result.
+liftCoerce
+  :: (MonadEval m, TR.Typeable a)
+  => (K.Const -> Maybe a) -- ^ The coersion.
+  -> K.Const              -- ^ The constant to coerce.
+  -> m a                  -- ^ The final result.
 liftCoerce f k = addTypeError (f k) k
 
 -- | Tags a coersion with a type error.
 --
 --   This separate function mainly exists to make the use of Typeable behave.
-addTypeError :: (MonadEval m, TR.Typeable a)
-             => Maybe a -- ^ The result of the coersion.
-             -> K.Const -- ^ The constant that was coerced.
-             -> m a     -- ^ The final result.
+addTypeError
+  :: (MonadEval m, TR.Typeable a)
+  => Maybe a -- ^ The result of the coersion.
+  -> K.Const -- ^ The constant that was coerced.
+  -> m a     -- ^ The final result.
 addTypeError r k = maybe (err (error r)) return r
+  -- The fromJust here is literally here to get the right type for Typeable;
+  -- it doesn't actually get evaluated.
   where error = CoerceError k . T.liftHsType . TR.typeOf . fromJust
 
 -- | Enumeration of possible errors when evaluating an expression.
@@ -166,4 +216,6 @@ data EvalError
     -- ^ A variable reference failed lookup in the heap.
   | CoerceError K.Const (Maybe T.SType)
     -- ^ A coersion failed.
+  | NotMoError K.Const
+    -- ^ We expected an expression to evaluate to a memory order, but it didn't.
     deriving (Eq, Show)

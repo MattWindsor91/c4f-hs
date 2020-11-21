@@ -1,7 +1,7 @@
 --------------------------------------------------------------------------------
 -- |
--- Module      : Language.C4.Fir.Stmt.Atomic
--- Description : C4 Fuzzable Internal Representation: Atomic statements
+-- Module      : Language.C4.Fir.Stmt.Prim
+-- Description : C4 Fuzzable Internal Representation: Primitive statements
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com
