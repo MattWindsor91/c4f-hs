@@ -21,12 +21,12 @@ soon, check the above.
   thought it'd be interesting to see if a language that works well with those
   concepts rather than fighting against OCaml.
 
-## Licence
+## Licence
 
 MIT; at present, unlike the OCaml fuzzer, this project has not inherited any
 code from otherwise-licenced projects.
 
-## What it can do
+## What it can do
 
 Nothing, at the moment: it just has parts of the expression evaluator, operator
 algebra, and internal representation AST so far.  It'll be a long time (tends
