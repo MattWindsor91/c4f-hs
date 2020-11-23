@@ -73,6 +73,7 @@ test-suite c4f-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Test.Fir.Atomic.MemOrder
       Test.Fir.Const
       Test.Fir.Id
       Test.Fir.Lvalue

@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveFunctor, TemplateHaskell, KindSignatures #-}
-
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Atomic.MemOrder
@@ -59,9 +58,15 @@ module Language.C4.Fir.Atomic.MemOrder
     -- ** Optics
   , success
   , failure
+    -- * Generators
+  , genMemOrder
+  , genMemOrderArg
+  , genMemScope
   ) where
 
 import Control.Lens ((^?), Iso', iso, makeLenses, makePrisms, makeClassyPrisms)
+import Hedgehog (MonadGen)
+import qualified Hedgehog.Gen as Gen
 
 -- | Enumeration of all memory orders.
 --
@@ -77,6 +82,8 @@ data MemOrder
              -- ^ This is almost a valid total ordering on memory order
              --   strength, except that (for instance) it arbitrarily orders
              --   'Release' after 'Acquire'.
+             , Enum
+             , Bounded
              , Show
              )
 makeClassyPrisms ''MemOrder
@@ -97,14 +104,17 @@ data MemScope
              , Ord
              -- ^ There is no semantic meaning to this; it exists to allow for
              --   use in maps etc.
+             , Enum
+             , Bounded
              , Show
              )
 
 -- | A memory order argument, parametrised on either a memory order or an
 --   expression or container contaning them.
 data MemOrderArg e
-  = Implicit   -- ^ An implicit memory order (ie, sequential consistency).
-  | Explicit e -- ^ An explicit memory order.
+  = Implicit            -- ^ An implicit memory order (sequential consistency).
+  | Explicit e          -- ^ An explicit memory order.
+  | Scoped   e MemScope -- ^ An explicit memory order with OpenCL scope.
     deriving ( Eq
              , Ord
              -- ^ There is no semantic meaning to this; it exists to allow for
@@ -114,12 +124,16 @@ data MemOrderArg e
              )
 makePrisms ''MemOrderArg
 
--- | 'MemOrderArg' is isomorphic to 'Maybe' @e@, where @e@ is the memory order
---   expression.
-_moMaybe :: Iso' (MemOrderArg e) (Maybe e)
+-- | 'MemOrderArg' is isomorphic to a nested pair of 'Maybe's capturing the
+--   three different possibilities
+_moMaybe :: Iso' (MemOrderArg e) (Maybe (e, Maybe MemScope))
 _moMaybe = iso toMaybe fromMaybe
-  where toMaybe x = x ^? _Explicit
-        fromMaybe = maybe Implicit Explicit
+  where toMaybe Implicit       = Nothing
+        toMaybe (Explicit e  ) = Just (e, Nothing)
+        toMaybe (Scoped   e s) = Just (e, Just s)
+        fromMaybe Nothing             = Implicit
+        fromMaybe (Just (e, Nothing)) = Explicit e
+        fromMaybe (Just (e, Just s )) = Scoped   e s
 
 -- | A memory order pair for a compare-exchange.
 data CmpxchgMemOrder e
@@ -128,3 +142,31 @@ data CmpxchgMemOrder e
       , _failure :: e -- ^ Memory order on failure.
       } deriving (Eq, Ord, Functor, Show)
 makeLenses ''CmpxchgMemOrder
+
+{-
+ - Generators
+ -}
+
+-- | Generator for arbitrary memory orders.
+genMemOrder :: MonadGen m => m MemOrder
+genMemOrder = Gen.enumBounded
+
+-- TODO(@MattWindsor91): operation-safe generators
+
+-- | Generator for arbitrary memory scopes.
+genMemScope :: MonadGen m => m MemScope
+genMemScope = Gen.enumBounded
+
+-- | Parametric generator for memory order arguments.
+genMemOrderArg
+  :: MonadGen m
+  => m e               -- ^ Generator for memory order expressions.
+  -> m MemScope        -- ^ Generator for memory scopes.
+  -> m (MemOrderArg e) -- ^ Generator for memory order arguments.
+genMemOrderArg genO genS =
+  -- Shrinking towards the most implicit definitions.
+  Gen.choice
+    [ pure Implicit
+    , Explicit <$> genO
+    , Scoped   <$> genO <*> genS
+    ]
