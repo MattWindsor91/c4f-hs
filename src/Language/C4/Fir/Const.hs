@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Const
--- Description : C4 Fuzzable Internal Representation: Constants
+-- Description : Constant definitions for FIR
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com

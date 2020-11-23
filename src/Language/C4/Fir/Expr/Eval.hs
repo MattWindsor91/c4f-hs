@@ -1,8 +1,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 --------------------------------------------------------------------------------
 -- |
--- Module      : Language.C4.Fir.Expr.Op
--- Description : C4 Fuzzable Internal Representation: Operators
+-- Module      : Language.C4.Fir.Expr.Eval
+-- Description : Operator definitions for FIR
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com
@@ -17,9 +17,10 @@
 --------------------------------------------------------------------------------
 --
 module Language.C4.Fir.Expr.Eval
-  ( MonadEval (load, store, rmw, cmpxchg, err)
-  , evalExpr
-    -- * Error
+  ( evalExpr
+    -- * The evaluation monad
+  , MonadEval (load, store, rmw, cmpxchg, err)
+    -- * Errors
   , EvalError (CoerceError, NotMoError, VarError)
   ) where
 
@@ -51,8 +52,8 @@ class Monad m => MonadEval m where
   store :: Maybe MemOrder -> NormAddress -> K.Const -> m ()
   -- | Atomically reads, modifies, and writes a heap value.
   rmw :: MemOrder -> NormAddress -> (K.Const -> K.Const) -> m K.Const
-  -- | Compare and exchange: `cmpxchg succ fail obj expected desired` has
-  --   the same semantics as `atomic_compare_exchange_strong_explicit`.
+  -- | Compare and exchange: @cmpxchg succ fail obj expected desired@ has
+  --   the same semantics as @atomic_compare_exchange_strong_explicit@.
   cmpxchg :: MemOrder -> MemOrder -> NormAddress -> NormAddress -> K.Const -> m Bool
   -- | Throws an error.
   err :: EvalError -> m a

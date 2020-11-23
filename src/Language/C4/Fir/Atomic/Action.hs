@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveFunctor, TemplateHaskell #-}
 --------------------------------------------------------------------------------
 -- |
--- Module      : Language.C4.Fir.Atomic.Load
--- Description : C4 Fuzzable Internal Representation: Atomic actions
+-- Module      : Language.C4.Fir.Atomic.Action
+-- Description : Atomic actions for FIR
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com

@@ -3,7 +3,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Expr.Expr
--- Description : C4 Fuzzable Internal Representation: Expressions
+-- Description : Expression language for FIR
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com
@@ -11,7 +11,8 @@
 --------------------------------------------------------------------------------
 
 module Language.C4.Fir.Expr.Expr
-  ( Expr
+  ( -- * Top-level expressions
+    Expr
       ( Meta
       , ALoad
       , Prim
@@ -19,22 +20,7 @@ module Language.C4.Fir.Expr.Expr
       , Bin
       , Un
       )
-  , _Meta
-  , _ALoad
-  , _Prim
-  , _Cond
-  , _Bin
-  , _Un
-    -- * Primitive expressions
-  , PExpr (Con, Addr)
-  , _Con
-  , _Addr
-    -- * Conditional expressions
-  , CExpr (CExpr, _cond, _tBranch, _fBranch)
-  , cond
-  , tBranch
-  , fBranch
-    -- * Recursion schemes
+    -- ** Recursion schemes
   , ExprF
       ( MetaF
       , ALoadF
@@ -43,6 +29,24 @@ module Language.C4.Fir.Expr.Expr
       , BinF
       , UnF
       )
+    -- ** Optics
+  , _Meta
+  , _ALoad
+  , _Prim
+  , _Cond
+  , _Bin
+  , _Un
+    -- * Primitive expressions
+  , PExpr (Con, Addr)
+    -- ** Optics
+  , _Con
+  , _Addr
+    -- * Conditional expressions
+  , CExpr (CExpr, _cond, _tBranch, _fBranch)
+    -- ** Optics
+  , cond
+  , tBranch
+  , fBranch
     -- * Binary operator shorthand
   , arith
   , (@+) -- :: Expr m -> Expr m -> Expr m
@@ -82,9 +86,10 @@ data PExpr
     deriving (Eq, Show)
 -- There doesn't seem to be a good reason for PExprs to be classy.
 makePrisms ''PExpr
+-- | We can view constant primitive expressions as constants.
 instance AsConst PExpr where _Const = _Con
 
--- | Conditional ('ternary') expressions.
+-- | Conditional (ternary) expressions.
 data CExpr e
   = CExpr { _cond    :: e -- ^ The condition of the conditional expression.
           , _tBranch :: e -- ^ The true branch of the conditional expression.
@@ -106,13 +111,14 @@ data Expr m
    metadata parameter causes the resulting class to be very unwieldy.  This may
    change in future if we really need it.  -}
 makePrisms ''Expr
+-- | We can view constant expressions as constants.
 instance AsConst (Expr m) where _Const = _Prim . _Con
 
 {-
  - Recursion schemes
  -}
 
--- Base functor for 'Expr'.
+-- | Base functor for 'Expr'.
 --
 -- The 'Expr' type with all instances of recursion into 'Expr' replaced
 -- with a free type parameter.

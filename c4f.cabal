@@ -27,7 +27,6 @@ library
   exposed-modules:
       Language.C4.Fir.Atomic.Action
       Language.C4.Fir.Atomic.MemOrder
-      Language.C4.Fir.Atomic.MemScope
       Language.C4.Fir.Const
       Language.C4.Fir.Expr.Eval
       Language.C4.Fir.Expr.Expr
@@ -38,7 +37,6 @@ library
       Language.C4.Fir.OpAlgebra
       Language.C4.Fir.Stmt.Prim
       Language.C4.Fir.Type
-      Lib
   other-modules:
       Paths_c4f
   hs-source-dirs:
