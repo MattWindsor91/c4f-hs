@@ -2,7 +2,7 @@
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Const
--- Description : Tests for Language.C4.Fir.Atomic.MemOrder
+-- Description : Tests for Language.C4.Fir.Const
 -- Copyright   : (c) Matt Windsor, 2018, 2019, 2020
 -- License     : MIT
 -- Maintainer  : mattwindsor91@gmail.com

@@ -36,6 +36,7 @@ library
       Language.C4.Fir.Lvalue
       Language.C4.Fir.OpAlgebra
       Language.C4.Fir.Stmt.Prim
+      Language.C4.Fir.Stmt.Stmt
       Language.C4.Fir.Type
   other-modules:
       Paths_c4f
@@ -78,6 +79,7 @@ test-suite c4f-test
       Test.Fir.Id
       Test.Fir.Lvalue
       Test.Fir.OpAlgebra
+      Test.Fir.Stmt.Stmt
       Paths_c4f
   hs-source-dirs:
       test

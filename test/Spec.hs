@@ -6,6 +6,7 @@ import Test.Fir.Const
 import Test.Fir.Id
 import Test.Fir.Lvalue
 import Test.Fir.OpAlgebra
+import Test.Fir.Stmt.Stmt
 
 main :: IO ()
 main = do
@@ -18,6 +19,7 @@ main = do
     , Test.Fir.Id.tests
     , Test.Fir.Lvalue.tests
     , Test.Fir.OpAlgebra.tests
+    , Test.Fir.Stmt.Stmt.tests
     ]
 
   unless (and results) exitFailure

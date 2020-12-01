@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Stmt.Prim
@@ -9,15 +10,15 @@
 --------------------------------------------------------------------------------
 
 module Language.C4.Fir.Stmt.Prim
-  ( AtomStmt
-  , PrimStmt ( Atomic, Nop ) ) where
+  ( PrimStmt ( Nop )
+  , -- * Optics
+    AsPrimStmt
+  , _PrimStmt
+  , _Nop
+  ) where
 
--- | Type of atomic statements.
-data AtomStmt
-
--- | Type of 
-
+import qualified Control.Lens as L
 -- | Type of primitive statements.
 data PrimStmt
-  = Atomic AtomStmt -- ^ An atomic statement.
-  | Nop             -- ^ No-operation.
+  = Nop             -- ^ No-operation.
+L.makeClassyPrisms ''PrimStmt
