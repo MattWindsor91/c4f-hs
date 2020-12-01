@@ -1,8 +1,8 @@
 {-# LANGUAGE DeriveTraversable
-           , KindSignatures
            , MultiParamTypeClasses
            , NamedFieldPuns
-           , TemplateHaskell #-}
+           , TemplateHaskell
+           , TypeFamilies #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Stmt.Stmt
@@ -17,7 +17,9 @@
 
 module Language.C4.Fir.Stmt.Stmt
   ( -- * Statements
-    Stmt (Prim, Block, If, For)
+    Stmt (SMeta, Prim, Block, Lock, If, For)
+    -- ** Recursion schemes
+  , StmtF (SMetaF, PrimF, BlockF, LockF, IfF, ForF)
     -- * Flow blocks
   , Flow (Flow, _header, _blocks)
     -- ** Headers
@@ -38,16 +40,17 @@ module Language.C4.Fir.Stmt.Stmt
   , IsHeader    (headerExprs)
     -- ** Optics
     -- * Components
-  , StmtBlock   (StmtBlock, _blockMeta, _blockStmts)
+  , StmtBlock   (StmtBlock, _blockStmts)
   , IfBlock     (IfBlock, _tBranch, _fBranch)
     -- ** Optics
-  , blockMeta
   , blockStmts
   , tBranch
   , fBranch
   ) where
 
 import qualified Control.Lens as L
+import qualified Data.Functor.Foldable as F
+
 import Language.C4.Fir.Expr.Expr (Expr)
 import Language.C4.Fir.Stmt.Prim (PrimStmt, AsPrimStmt, _PrimStmt)
 
@@ -115,18 +118,19 @@ castLockHeaderMeta SyncLock   = SyncLock
 instance IsHeader LockHeader where
   headerExprs = const (pure . castLockHeaderMeta)
 
--- | A single block containing statements and metadata.
-data StmtBlock m s =
-  StmtBlock { _blockMeta  :: m   -- ^ Block-level metadata.
-            , _blockStmts :: [s] -- ^ Block statements.
+-- | A single block containing statements.
+--
+-- This datatype mainly exists to allow expansion into 
+newtype StmtBlock s =
+  StmtBlock { _blockStmts :: [s] -- ^ Block statements.
             } deriving (Eq, Show)
 L.makeLenses ''StmtBlock
 
--- | 'StmtBlock's are bifunctors where 'first' operates over the immediate
---   block metadata, and 'second' operates over block statements.
-instance L.Bifunctor StmtBlock where
-  bimap f g StmtBlock { _blockMeta, _blockStmts } =
-    StmtBlock { _blockMeta = f _blockMeta, _blockStmts = g <$> _blockStmts }
+-- | We can traverse over the statements of a StmtBlock.
+--   While this can modify any metadata in the statements, it can't modify the
+--   metadata in the block head.
+instance Functor StmtBlock where
+  fmap = L.over (blockStmts . L.each)
 
 -- | A pair of blocks representing the branches of an if statement.
 data IfBlock b
@@ -147,24 +151,53 @@ instance L.FunctorWithIndex Bool IfBlock where
 -- 'FoldableWithIndex' etc with some sort of index.
 data Flow (h :: * -> *) (f :: * -> *) m s =
   Flow { _header :: h m
-       , _blocks :: f (StmtBlock m s)
+       , _blocks :: f (StmtBlock s)
        }
+
+instance Functor f => Functor (Flow h f m) where
+  fmap f Flow { _header, _blocks } = Flow { _header, _blocks=bs }
+    where bs = fmap (fmap f) _blocks
 
 -- | A statement, parametrised over metadata.
 data Stmt m
-  = Prim PrimStmt
-    -- ^ A primitive statement.
-  | If  (Flow IfHeader IfBlock m (Stmt m))
-    -- ^ An if statement.
-  | For (Flow ForHeader L.Identity m (Stmt m))
-    -- ^ A for loop.
-  | While (Flow WhileHeader L.Identity m (Stmt m))
-    -- ^ A while loop.
-  | Block (Flow BlockHeader L.Identity m (Stmt m))
-    -- ^ A direct block.
-  | Lock (Flow LockHeader L.Identity m (Stmt m))
-    -- ^ A lock block.
+  = SMeta m (Stmt m)                               -- ^ A metadata tag.
+  | Prim  PrimStmt                                 -- ^ A primitive statement.
+  | If    (Flow IfHeader    IfBlock    m (Stmt m)) -- ^ An if statement.
+  | For   (Flow ForHeader   L.Identity m (Stmt m)) -- ^ A for loop.
+  | While (Flow WhileHeader L.Identity m (Stmt m)) -- ^ A while loop.
+  | Block (Flow BlockHeader L.Identity m (Stmt m)) -- ^ A direct block.
+  | Lock  (Flow LockHeader  L.Identity m (Stmt m)) -- ^ A lock block.
 L.makePrisms ''Stmt
 
 -- | We can turn 'PrimStmt' prisms on 'Stmt'.
 instance AsPrimStmt (Stmt m) where _PrimStmt = _Prim
+
+-- | Recursion-schemes base functor for 'Stmt'.
+data StmtF m s
+  = SMetaF m s                               -- ^ Non-recursive 'SMeta'.
+  | PrimF  PrimStmt                          -- ^ Non-recursive 'Prim'.
+  | IfF    (Flow IfHeader    IfBlock    m s) -- ^ Non-recursive 'If'.
+  | ForF   (Flow ForHeader   L.Identity m s) -- ^ Non-recursive 'For'.
+  | WhileF (Flow WhileHeader L.Identity m s) -- ^ Non-recursive 'While'.
+  | BlockF (Flow BlockHeader L.Identity m s) -- ^ Non-recursive 'While'.
+  | LockF  (Flow LockHeader  L.Identity m s) -- ^ Non-recursive 'While'.
+    deriving Functor
+
+type instance F.Base (Stmt m) = StmtF m
+instance F.Recursive (Stmt m) where
+  project (SMeta m x) = SMetaF m x
+  project (Prim  p  ) = PrimF  p
+  project (If    f  ) = IfF    f
+  project (For   f  ) = ForF   f
+  project (While f  ) = WhileF f
+  project (Block f  ) = BlockF f
+  project (Lock  f  ) = LockF  f
+instance F.Corecursive (Stmt m) where
+  embed (SMetaF m x) = SMeta m x
+  embed (PrimF  p  ) = Prim  p
+  embed (IfF    f  ) = If    f
+  embed (ForF   f  ) = For   f
+  embed (WhileF f  ) = While f
+  embed (BlockF f  ) = Block f
+  embed (LockF  f  ) = Lock  f
+  
