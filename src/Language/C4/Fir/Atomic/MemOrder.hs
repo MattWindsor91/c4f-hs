@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, TemplateHaskell, KindSignatures #-}
+{-# LANGUAGE DeriveTraversable, TemplateHaskell, KindSignatures #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Atomic.MemOrder
@@ -64,7 +64,7 @@ module Language.C4.Fir.Atomic.MemOrder
   , genMemScope
   ) where
 
-import Control.Lens ((^?), Iso', iso, makeLenses, makePrisms, makeClassyPrisms)
+import Control.Lens (Iso', iso, makeLenses, makePrisms, makeClassyPrisms)
 import Hedgehog (MonadGen)
 import qualified Hedgehog.Gen as Gen
 
@@ -120,6 +120,8 @@ data MemOrderArg e
              -- ^ There is no semantic meaning to this; it exists to allow for
              --   use in maps etc.
              , Functor
+             , Foldable
+             , Traversable
              , Show
              )
 makePrisms ''MemOrderArg
@@ -140,7 +142,7 @@ data CmpxchgMemOrder e
   = CmpxchgMemOrder
       { _success :: e -- ^ Memory order on success.
       , _failure :: e -- ^ Memory order on failure.
-      } deriving (Eq, Ord, Functor, Show)
+      } deriving (Eq, Ord, Functor, Foldable, Traversable, Show)
 makeLenses ''CmpxchgMemOrder
 
 {-

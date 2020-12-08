@@ -2,7 +2,7 @@ cradle:
   stack:
     - path: "./src"
       component: "c4f:lib"
-    - path: "./exe"
-      component: "c4f:exe:c4f-exe"
+    - path: "./app"
+      component: "c4f:exe:c4f-app"
     - path: "./test"
       component: "c4f:test:c4f-test"

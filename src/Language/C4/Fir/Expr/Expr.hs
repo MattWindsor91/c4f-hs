@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, TemplateHaskell, TypeFamilies #-}
+{-# LANGUAGE DeriveTraversable, TemplateHaskell, TypeFamilies #-}
 
 --------------------------------------------------------------------------------
 -- |
@@ -36,6 +36,7 @@ module Language.C4.Fir.Expr.Expr
   , _Cond
   , _Bin
   , _Un
+  , exprMeta
     -- * Primitive expressions
   , PExpr (Con, Addr)
     -- ** Optics
@@ -67,7 +68,7 @@ module Language.C4.Fir.Expr.Expr
   , (@||) -- :: Expr m -> Expr m -> Expr m
   ) where
 
-import Control.Lens (makeLenses, makePrisms)
+import qualified Control.Lens as L
 import qualified Data.Functor.Foldable as F
 import Language.C4.Fir.Atomic.Action (Load)
 import Language.C4.Fir.Const (AsConst, Const, _Const)
@@ -85,7 +86,7 @@ data PExpr
   | Addr Address   -- ^ Address expression.
     deriving (Eq, Show)
 -- There doesn't seem to be a good reason for PExprs to be classy.
-makePrisms ''PExpr
+L.makePrisms ''PExpr
 -- | We can view constant primitive expressions as constants.
 instance AsConst PExpr where _Const = _Con
 
@@ -94,8 +95,13 @@ data CExpr e
   = CExpr { _cond    :: e -- ^ The condition of the conditional expression.
           , _tBranch :: e -- ^ The true branch of the conditional expression.
           , _fBranch :: e -- ^ The false branch of the conditional expression.
-          } deriving (Eq, Show, Functor)
-makeLenses ''CExpr
+          } deriving ( Eq
+                     , Show
+                     , Functor     -- ^ Mapping over sub-expressions.
+                     , Foldable    -- ^ Folding over sub-expressions.
+                     , Traversable -- ^ Traversing over sub-expressions.
+                     )
+L.makeLenses ''CExpr
 
 -- | Top-level expressions.
 data Expr m
@@ -110,7 +116,7 @@ data Expr m
 {- We don't make classy prisms for Exprs, because the introduction of the
    metadata parameter causes the resulting class to be very unwieldy.  This may
    change in future if we really need it.  -}
-makePrisms ''Expr
+L.makePrisms ''Expr
 -- | We can view constant expressions as constants.
 instance AsConst (Expr m) where _Const = _Prim . _Con
 
@@ -147,6 +153,26 @@ instance F.Corecursive (Expr m) where
   embed (CondF  x    ) = Cond  x
   embed (BinF   o l r) = Bin   o l r
   embed (UnF    o x  ) = Un    o x
+
+{-
+ - Traversals
+ -}
+
+-- | Traverses over all of the metadata in an expression.
+exprMeta :: L.Traversal (Expr m1) (Expr m2) m1 m2
+exprMeta f = F.fold (exprMeta' f)
+
+exprMeta' :: Applicative f => (m1 -> f m2) -> ExprF m1 (f (Expr m2)) -> f (Expr m2)
+exprMeta' f (MetaF  m b   ) = Meta  <$> f m <*> b
+exprMeta' _ (PrimF  p     ) = pure (Prim p)
+exprMeta' _ (ALoadF l     ) = ALoad <$> sequenceA l
+exprMeta' _ (CondF  c     ) = Cond  <$> sequenceA c
+exprMeta' _ (BinF   o l r ) = Bin o <$> l <*> r
+exprMeta' _ (UnF    o u   ) = Un  o <$> u
+
+instance Functor Expr where fmap = L.over exprMeta
+instance Foldable Expr where foldMap = L.foldMapOf exprMeta
+instance Traversable Expr where traverse = exprMeta
 
 {-
  - Binary operator shorthand

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, TemplateHaskell #-}
+{-# LANGUAGE DeriveTraversable, TemplateHaskell #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Atomic.Action
@@ -30,5 +30,5 @@ data Load e
            -- ^ The source address.
          , _mo  :: M.MemOrderArg e
            -- ^ The memory order argument.
-         } deriving (Eq, Functor, Show)
+         } deriving (Eq, Functor, Foldable, Traversable, Show)
 L.makeLenses ''Load

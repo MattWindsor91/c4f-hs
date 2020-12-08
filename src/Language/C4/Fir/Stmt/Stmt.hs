@@ -20,6 +20,8 @@ module Language.C4.Fir.Stmt.Stmt
     Stmt (SMeta, Prim, Block, Lock, If, For)
     -- ** Recursion schemes
   , StmtF (SMetaF, PrimF, BlockF, LockF, IfF, ForF)
+    -- ** Optics
+  , stmtMeta
     -- * Flow blocks
   , Flow (Flow, _header, _blocks)
     -- ** Headers
@@ -30,6 +32,8 @@ module Language.C4.Fir.Stmt.Stmt
   , WhileHeader  (_whileKind, _whileCond)
   , WhileKind    (AWhile, ADoWhile)
     -- ** Optics
+  , header
+  , blocks
   , forInit
   , forCond
   , forUpdate
@@ -51,14 +55,8 @@ module Language.C4.Fir.Stmt.Stmt
 import qualified Control.Lens as L
 import qualified Data.Functor.Foldable as F
 
-import Language.C4.Fir.Expr.Expr (Expr)
+import Language.C4.Fir.Expr.Expr (Expr, exprMeta)
 import Language.C4.Fir.Stmt.Prim (PrimStmt, AsPrimStmt, _PrimStmt)
-
--- | A flow block header for if statements.
-newtype IfHeader m = IfHeader (Expr m)
-L.makePrisms ''IfHeader
-
--- TODO(@MattWindsor91): replace the types in ForHeader with the right ones.
 
 -- | Class of functionality common to all headers.
 class IsHeader (h :: * -> *) where 
@@ -68,6 +66,22 @@ class IsHeader (h :: * -> *) where
   --   traversals can change the metadata.
   headerExprs :: L.Traversal (h m) (h m') (Expr m) (Expr m')
 
+-- | Traverses through all metadata in this header.
+--
+--   As expressions are the only place where headers contain metadata, such
+--   traversals can change the metadata.
+headerMeta :: IsHeader h => L.Traversal (h m) (h m') m m'
+headerMeta = headerExprs . exprMeta
+
+-- | A flow block header for if statements.
+newtype IfHeader m = IfHeader (Expr m)
+L.makePrisms ''IfHeader
+
+-- | If headers are headers where the header itself is the only expression.
+instance IsHeader IfHeader where headerExprs = _IfHeader
+
+-- TODO(@MattWindsor91): replace the types in ForHeader with the right ones.
+
 -- | A for loop header.
 data ForHeader m
   = ForHeader
@@ -76,6 +90,16 @@ data ForHeader m
       , _forUpdate :: Maybe (Expr m) -- ^ The update leg of the for loop.
       }
 L.makeLenses ''ForHeader
+
+-- | For headers are headers.
+instance IsHeader ForHeader
+  -- TODO(@MattWindsor91): fix up when we replace types
+  where
+    headerExprs f ForHeader { _forInit, _forCond, _forUpdate } =
+      ( \ i c u -> ForHeader { _forInit=i, _forCond=c, _forUpdate = u} )
+      <$> L.traverseOf L._Just f _forInit
+      <*> L.traverseOf L._Just f _forCond
+      <*> L.traverseOf L._Just f _forUpdate
 
 -- | A kind of while loop.
 data WhileKind
@@ -89,6 +113,9 @@ data WhileHeader m
       , _whileKind :: WhileKind -- ^ Kind of while loop.
       }
 L.makeLenses ''WhileHeader
+
+-- | While headers are headers where the condition is the only expression.
+instance IsHeader WhileHeader where headerExprs = whileCond
 
 -- | A header for an implicit or explicit block.
 data BlockHeader m
@@ -123,14 +150,8 @@ instance IsHeader LockHeader where
 -- This datatype mainly exists to allow expansion into 
 newtype StmtBlock s =
   StmtBlock { _blockStmts :: [s] -- ^ Block statements.
-            } deriving (Eq, Show)
+            } deriving (Eq, Show, Functor, Foldable, Traversable)
 L.makeLenses ''StmtBlock
-
--- | We can traverse over the statements of a StmtBlock.
---   While this can modify any metadata in the statements, it can't modify the
---   metadata in the block head.
-instance Functor StmtBlock where
-  fmap = L.over (blockStmts . L.each)
 
 -- | A pair of blocks representing the branches of an if statement.
 data IfBlock b
@@ -153,6 +174,7 @@ data Flow (h :: * -> *) (f :: * -> *) m s =
   Flow { _header :: h m
        , _blocks :: f (StmtBlock s)
        }
+L.makeLenses ''Flow
 
 instance Functor f => Functor (Flow h f m) where
   fmap f Flow { _header, _blocks } = Flow { _header, _blocks=bs }
@@ -200,4 +222,28 @@ instance F.Corecursive (Stmt m) where
   embed (WhileF f  ) = While f
   embed (BlockF f  ) = Block f
   embed (LockF  f  ) = Lock  f
-  
+
+{-
+flowMeta :: IsHeader h => L.Traversal (Flow h t m1 s) (Flow h t m2 s) m1 m2
+flowMeta = header . headerMeta
+
+flowStmts :: Traversable t => L.Traversal (Flow h t m s1) (Flow h t m s2) s1 s2
+flowStmts = blocks . traverse . blockStmts . L.each
+-}
+
+-- | Traverses over the metadata inside a statement.
+stmtMeta :: L.Traversal (Stmt m1) (Stmt m2) m1 m2
+stmtMeta f = F.fold stmtMeta'
+  where stmtMeta' (SMetaF m x) = SMeta <$> f m <*> x
+        -- | TODO(@MattWindsor91): prims will have metadata soon.
+        stmtMeta' (PrimF  p  ) = pure (Prim p)
+        stmtMeta' (IfF    x  ) = If    <$> flowStep f x
+        stmtMeta' (ForF   x  ) = For   <$> flowStep f x
+        stmtMeta' (WhileF x  ) = While <$> flowStep f x
+        stmtMeta' (BlockF x  ) = Block <$> flowStep f x
+        stmtMeta' (LockF  x  ) = Lock  <$> flowStep f x
+        -- The type of this seems difficult to deduce if we make 'f' implicit.
+        flowStep f Flow { _header, _blocks } =
+          (\h b -> Flow { _header=h, _blocks=b })
+            <$> headerMeta f _header
+            <*> traverse sequenceA _blocks
