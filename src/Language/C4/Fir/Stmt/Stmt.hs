@@ -25,7 +25,7 @@ module Language.C4.Fir.Stmt.Stmt
     -- * Flow blocks
   , Flow (Flow, _header, _blocks)
     -- ** Headers
-  , BlockHeader (ImpBlock, ExpBlock)
+  , BlockHeader  (ImpBlock, ExpBlock)
   , ForHeader    (_forInit, _forCond, _forUpdate)
   , IfHeader     (IfHeader)
   , LockHeader   (AtomicLock, SyncLock)
@@ -56,7 +56,7 @@ import qualified Control.Lens as L
 import qualified Data.Functor.Foldable as F
 
 import Language.C4.Fir.Expr.Expr (Expr, exprMeta)
-import Language.C4.Fir.Stmt.Prim (PrimStmt, AsPrimStmt, _PrimStmt)
+import Language.C4.Fir.Stmt.Prim (PrimStmt, AsPrimStmt, _PrimStmt, primMeta)
 
 -- | Class of functionality common to all headers.
 class IsHeader (h :: * -> *) where 
@@ -183,7 +183,7 @@ instance Functor f => Functor (Flow h f m) where
 -- | A statement, parametrised over metadata.
 data Stmt m
   = SMeta m (Stmt m)                               -- ^ A metadata tag.
-  | Prim  PrimStmt                                 -- ^ A primitive statement.
+  | Prim  (PrimStmt (Expr m))                      -- ^ A primitive statement.
   | If    (Flow IfHeader    IfBlock    m (Stmt m)) -- ^ An if statement.
   | For   (Flow ForHeader   L.Identity m (Stmt m)) -- ^ A for loop.
   | While (Flow WhileHeader L.Identity m (Stmt m)) -- ^ A while loop.
@@ -192,12 +192,12 @@ data Stmt m
 L.makePrisms ''Stmt
 
 -- | We can turn 'PrimStmt' prisms on 'Stmt'.
-instance AsPrimStmt (Stmt m) where _PrimStmt = _Prim
+instance AsPrimStmt (Stmt m) (Expr m) where _PrimStmt = _Prim
 
 -- | Recursion-schemes base functor for 'Stmt'.
 data StmtF m s
   = SMetaF m s                               -- ^ Non-recursive 'SMeta'.
-  | PrimF  PrimStmt                          -- ^ Non-recursive 'Prim'.
+  | PrimF  (PrimStmt (Expr m))               -- ^ Non-recursive 'Prim'.
   | IfF    (Flow IfHeader    IfBlock    m s) -- ^ Non-recursive 'If'.
   | ForF   (Flow ForHeader   L.Identity m s) -- ^ Non-recursive 'For'.
   | WhileF (Flow WhileHeader L.Identity m s) -- ^ Non-recursive 'While'.
@@ -235,8 +235,7 @@ flowStmts = blocks . traverse . blockStmts . L.each
 stmtMeta :: L.Traversal (Stmt m1) (Stmt m2) m1 m2
 stmtMeta f = F.fold stmtMeta'
   where stmtMeta' (SMetaF m x) = SMeta <$> f m <*> x
-        -- | TODO(@MattWindsor91): prims will have metadata soon.
-        stmtMeta' (PrimF  p  ) = pure (Prim p)
+        stmtMeta' (PrimF  p  ) = Prim  <$> primMeta f p
         stmtMeta' (IfF    x  ) = If    <$> flowStep f x
         stmtMeta' (ForF   x  ) = For   <$> flowStep f x
         stmtMeta' (WhileF x  ) = While <$> flowStep f x
