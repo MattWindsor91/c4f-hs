@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE FlexibleContexts, NamedFieldPuns #-}
 --------------------------------------------------------------------------------
 -- |
 -- Module      : Language.C4.Fir.Expr.Eval
@@ -33,6 +33,7 @@ import Data.Maybe (fromJust)
 import qualified Type.Reflection as TR
 import qualified Language.C4.Fir.Atomic.Action as A
 import qualified Language.C4.Fir.Const as K
+import Language.C4.Fir.If ( branch )
 import Language.C4.Fir.Expr.Expr
   ( Expr (..) 
   , ExprF (..)
@@ -107,9 +108,9 @@ evalCExpr
   :: MonadEval m
   => CExpr (m K.Const) -- ^ The conditional expression.
   -> m K.Const         -- ^ The computation for the result.
-evalCExpr CExpr { _cond, _tBranch, _fBranch } =
+evalCExpr CExpr { _cond, _branches } =
   _cond >>= liftCoerce K.coerceBool >>= doCond
-  where doCond c = if c then _tBranch else _fBranch
+  where doCond c = L.view (branch c) _branches
 
 {-
  - Binary operators

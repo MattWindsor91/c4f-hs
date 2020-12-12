@@ -43,11 +43,10 @@ module Language.C4.Fir.Expr.Expr
   , _Con
   , _Addr
     -- * Conditional expressions
-  , CExpr (CExpr, _cond, _tBranch, _fBranch)
+  , CExpr (CExpr, _cond, _branches)
     -- ** Optics
   , cond
-  , tBranch
-  , fBranch
+  , branches
     -- * Binary operator shorthand
   , arith
   , (@+) -- :: Expr m -> Expr m -> Expr m
@@ -71,8 +70,9 @@ module Language.C4.Fir.Expr.Expr
 import qualified Control.Lens as L
 import qualified Data.Functor.Foldable as F
 import Language.C4.Fir.Atomic.Action (Load)
-import Language.C4.Fir.Const (AsConst, Const, _Const)
-import Language.C4.Fir.Lvalue (Address)
+import Language.C4.Fir.Const         (AsConst, Const, _Const)
+import Language.C4.Fir.If            (If)
+import Language.C4.Fir.Lvalue        (Address)
 import Language.C4.Fir.Expr.Op
   (ABop (..), BBop (..), LBop (..), RBop (..), Bop (..), Uop (..) )
 
@@ -92,9 +92,8 @@ instance AsConst PExpr where _Const = _Con
 
 -- | Conditional (ternary) expressions.
 data CExpr e
-  = CExpr { _cond    :: e -- ^ The condition of the conditional expression.
-          , _tBranch :: e -- ^ The true branch of the conditional expression.
-          , _fBranch :: e -- ^ The false branch of the conditional expression.
+  = CExpr { _cond     :: e    -- ^ The condition of the conditional expression.
+          , _branches :: If e -- ^ The branches of the conditional expression.
           } deriving ( Eq
                      , Show
                      , Functor     -- ^ Mapping over sub-expressions.

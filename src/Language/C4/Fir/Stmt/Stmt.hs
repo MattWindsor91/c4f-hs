@@ -45,16 +45,14 @@ module Language.C4.Fir.Stmt.Stmt
     -- ** Optics
     -- * Components
   , StmtBlock   (StmtBlock, _blockStmts)
-  , IfBlock     (IfBlock, _tBranch, _fBranch)
     -- ** Optics
   , blockStmts
-  , tBranch
-  , fBranch
   ) where
 
 import qualified Control.Lens as L
 import qualified Data.Functor.Foldable as F
 
+import Language.C4.Fir.If        (If)
 import Language.C4.Fir.Expr.Expr (Expr, exprMeta)
 import Language.C4.Fir.Stmt.Prim (PrimStmt, AsPrimStmt, _PrimStmt, primMeta)
 
@@ -153,18 +151,6 @@ newtype StmtBlock s =
             } deriving (Eq, Show, Functor, Foldable, Traversable)
 L.makeLenses ''StmtBlock
 
--- | A pair of blocks representing the branches of an if statement.
-data IfBlock b
-  = IfBlock
-      { _tBranch :: b
-      , _fBranch :: b
-      } deriving (Functor, Foldable, Traversable)
-L.makeLenses ''IfBlock
-
-instance L.FunctorWithIndex Bool IfBlock where
-  imap f IfBlock { _tBranch, _fBranch } =
-    IfBlock { _tBranch = f True _tBranch, _fBranch = f False _fBranch }
-
 -- | Generalised structure of control-flow blocks.
 --
 -- Flow blocks contain two subcontainers: one is the flow header, and should
@@ -184,7 +170,7 @@ instance Functor f => Functor (Flow h f m) where
 data Stmt m
   = SMeta m (Stmt m)                               -- ^ A metadata tag.
   | Prim  (PrimStmt (Expr m))                      -- ^ A primitive statement.
-  | If    (Flow IfHeader    IfBlock    m (Stmt m)) -- ^ An if statement.
+  | If    (Flow IfHeader    If         m (Stmt m)) -- ^ An if statement.
   | For   (Flow ForHeader   L.Identity m (Stmt m)) -- ^ A for loop.
   | While (Flow WhileHeader L.Identity m (Stmt m)) -- ^ A while loop.
   | Block (Flow BlockHeader L.Identity m (Stmt m)) -- ^ A direct block.
@@ -198,7 +184,7 @@ instance AsPrimStmt (Stmt m) (Expr m) where _PrimStmt = _Prim
 data StmtF m s
   = SMetaF m s                               -- ^ Non-recursive 'SMeta'.
   | PrimF  (PrimStmt (Expr m))               -- ^ Non-recursive 'Prim'.
-  | IfF    (Flow IfHeader    IfBlock    m s) -- ^ Non-recursive 'If'.
+  | IfF    (Flow IfHeader    If         m s) -- ^ Non-recursive 'If'.
   | ForF   (Flow ForHeader   L.Identity m s) -- ^ Non-recursive 'For'.
   | WhileF (Flow WhileHeader L.Identity m s) -- ^ Non-recursive 'While'.
   | BlockF (Flow BlockHeader L.Identity m s) -- ^ Non-recursive 'While'.

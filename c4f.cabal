@@ -33,6 +33,7 @@ library
       Language.C4.Fir.Expr.Op
       Language.C4.Fir.Heap
       Language.C4.Fir.Id
+      Language.C4.Fir.If
       Language.C4.Fir.Lvalue
       Language.C4.Fir.Meta
       Language.C4.Fir.OpAlgebra
