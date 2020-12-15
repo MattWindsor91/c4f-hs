@@ -1,8 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.34.2.
+-- This file has been generated from package.yaml by hpack version 0.33.0.
 --
 -- see: https://github.com/sol/hpack
+--
+-- hash: cd9e539ff683f35d0ec5f16a505bd3f3801fc0187111ab9f2bf323dc2a4aa6fa
 
 name:           c4f
 version:        0.1.0.0
@@ -37,6 +39,7 @@ library
       Language.C4.Fir.Lvalue
       Language.C4.Fir.Meta
       Language.C4.Fir.OpAlgebra
+      Language.C4.Fir.Stmt.Flow
       Language.C4.Fir.Stmt.Prim
       Language.C4.Fir.Stmt.Stmt
       Language.C4.Fir.Type
@@ -46,6 +49,7 @@ library
       src
   build-depends:
       base >=4.7 && <5
+    , bifunctors >=5.5.7 && <6
     , bytestring >=0.10.10.1 && <0.11
     , containers >=0.6.2.1 && <0.7
     , hedgehog >=1.0.3 && <2
@@ -64,6 +68,7 @@ executable c4f-exe
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , bifunctors >=5.5.7 && <6
     , bytestring >=0.10.10.1 && <0.11
     , c4f
     , containers >=0.6.2.1 && <0.7
@@ -90,6 +95,7 @@ test-suite c4f-test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , bifunctors >=5.5.7 && <6
     , bytestring >=0.10.10.1 && <0.11
     , c4f
     , containers >=0.6.2.1 && <0.7
